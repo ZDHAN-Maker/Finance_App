@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: theme("fontFamily.display");
+  }
+
+  ::selection {
+    background-color: theme("colors.ledger.100");
+  }
+
+  :focus-visible {
+    outline: 2px solid theme("colors.ledger.500");
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tepi bergerigi ala kertas buku tabungan / struk — elemen signature. */
+  .passbook-perforation {
+    background-image: theme("backgroundImage.perforation");
+    background-size: theme("backgroundSize.perforation");
+    background-position: left center;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
