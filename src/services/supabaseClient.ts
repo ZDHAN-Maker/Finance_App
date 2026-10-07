@@ -5,6 +5,38 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
+const REMEMBER_SESSION_KEY = "dcash-remember-session";
+let rememberSession =
+  typeof window === "undefined" || window.sessionStorage.getItem(REMEMBER_SESSION_KEY) !== "false";
+
+export function setRememberSession(remember: boolean) {
+  rememberSession = remember;
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(REMEMBER_SESSION_KEY, String(remember));
+  }
+}
+
+const authStorage = {
+  async getItem(key: string) {
+    if (typeof window === "undefined") return null;
+    const preferred = rememberSession ? window.localStorage : window.sessionStorage;
+    const fallback = rememberSession ? window.sessionStorage : window.localStorage;
+    return preferred.getItem(key) ?? fallback.getItem(key);
+  },
+  async setItem(key: string, value: string) {
+    if (typeof window === "undefined") return;
+    const preferred = rememberSession ? window.localStorage : window.sessionStorage;
+    const fallback = rememberSession ? window.sessionStorage : window.localStorage;
+    fallback.removeItem(key);
+    preferred.setItem(key, value);
+  },
+  async removeItem(key: string) {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  },
+};
+
 if (!isSupabaseConfigured) {
   // eslint-disable-next-line no-console
   console.error(
@@ -19,5 +51,6 @@ export const supabase = createClient(url || "https://placeholder.supabase.co", a
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    storage: authStorage,
   },
 });

@@ -9,6 +9,7 @@ export function LoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -21,7 +22,9 @@ export function LoginPage() {
     setInfo(null);
     setSubmitting(true);
 
-    const result = mode === "login" ? await signIn(email, password) : await signUp(email, password, name);
+    const result = mode === "login"
+      ? await signIn(email, password, rememberMe)
+      : await signUp(email, password, name);
 
     if (result.error) {
       setError(result.error);
@@ -104,6 +107,18 @@ export function LoginPage() {
                 placeholder="Minimal 6 karakter"
               />
             </div>
+
+            {mode === "login" && (
+              <label className="flex items-center gap-2 text-sm text-ink-soft">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 accent-ledger-600"
+                />
+                Ingat saya di perangkat ini
+              </label>
+            )}
 
             {error && <p className="text-sm text-rust-500">{error}</p>}
             {info && <p className="text-sm text-ledger-600">{info}</p>}
