@@ -5,6 +5,11 @@ import { api } from "../services/api";
 import type { AppUserProfile } from "../types";
 import { IconLogout, IconSend } from "../components/Icons";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
+
 interface LinkCodeResult {
   code: string;
   expires_at: string;
@@ -19,6 +24,9 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installReady, setInstallReady] = useState(false);
 
   async function loadProfile() {
     setLoading(true);
@@ -34,6 +42,22 @@ export function SettingsPage() {
 
   useEffect(() => {
     loadProfile();
+
+    if ("Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPromptEvent(event as BeforeInstallPromptEvent);
+      setInstallReady(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
   }, []);
 
   async function handleGenerateCode() {
@@ -61,6 +85,25 @@ export function SettingsPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleEnableNotifications() {
+    if (!("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    setError(permission === "granted" ? null : "Notifikasi dibatalkan. Anda tetap bisa pakai reminder di browser.");
+  }
+
+  async function handleInstallApp() {
+    if (!installPromptEvent) return;
+
+    await installPromptEvent.prompt();
+    setInstallReady(false);
+    setInstallPromptEvent(null);
   }
 
   return (
@@ -120,6 +163,34 @@ export function SettingsPage() {
         )}
 
         {error && <p className="mt-3 text-sm text-rust-500">{error}</p>}
+      </section>
+
+      <section className="mb-4 rounded-card border border-paper-line bg-paper-card p-5">
+        <p className="font-display text-base font-semibold text-ink">Notifikasi & install</p>
+
+        <div className="mt-3 space-y-3">
+          <button
+            type="button"
+            onClick={handleEnableNotifications}
+            className="w-full rounded-lg bg-ledger-500 px-3 py-2.5 text-sm font-semibold text-white hover:bg-ledger-600"
+          >
+            {notificationPermission === "granted"
+              ? "Notifikasi aktif"
+              : notificationPermission === "denied"
+                ? "Notifikasi diblokir"
+                : "Izinkan notifikasi"}
+          </button>
+
+          {installReady && installPromptEvent && (
+            <button
+              type="button"
+              onClick={handleInstallApp}
+              className="w-full rounded-lg border border-paper-line bg-paper px-3 py-2.5 text-sm font-semibold text-ink hover:bg-paper-line"
+            >
+              Install ke HP
+            </button>
+          )}
+        </div>
       </section>
 
       <button
