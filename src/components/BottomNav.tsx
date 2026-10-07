@@ -20,7 +20,7 @@ function navLinkClass(isActive: boolean, variant: "bottom" | "side") {
 
 export function BottomNav() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 flex border-t border-paper-line bg-paper-card/95 backdrop-blur md:hidden">
+    <nav aria-label="Navigasi utama" className="fixed bottom-0 left-0 right-0 z-30 flex border-t border-paper-line bg-paper-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
         <NavLink key={to} to={to} className={({ isActive }) => navLinkClass(isActive, "bottom")}>
           <Icon width={20} height={20} />
@@ -36,9 +36,9 @@ export function SideNav() {
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-paper-line bg-paper-card px-4 py-6 md:flex">
       <div className="mb-8 flex items-center gap-2 px-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-ledger-500 font-display text-sm font-semibold text-white">
-          K
+          D
         </div>
-        <span className="font-display text-lg font-semibold text-ink">Kas</span>
+        <span className="font-display text-lg font-semibold text-ink">D'Cash</span>
       </div>
       <div className="flex flex-1 flex-col gap-1">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => (

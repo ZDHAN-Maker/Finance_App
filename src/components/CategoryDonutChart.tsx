@@ -33,12 +33,12 @@ export function CategoryDonutChart({ breakdown }: { breakdown: CategoryBreakdown
       <ul className="flex-1 space-y-2">
         {breakdown.slice(0, 6).map((item, i) => (
           <li key={item.category_id ?? item.name} className="flex items-center justify-between gap-3 text-sm">
-            <span className="flex items-center gap-2 text-ink-soft">
+            <span className="flex min-w-0 items-center gap-2 text-ink-soft">
               <span
                 className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                 style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
               />
-              {item.name}
+              <span className="truncate">{item.name}</span>
             </span>
             <span className="font-mono tabular-nums text-ink-faint">{item.percentage}%</span>
           </li>

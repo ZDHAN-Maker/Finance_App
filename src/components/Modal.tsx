@@ -17,7 +17,7 @@ export function Modal({
         className="absolute inset-0 h-full w-full cursor-default"
         onClick={onClose}
       />
-      <div className="relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-card border border-paper-line bg-paper-card p-5 shadow-card sm:max-w-md sm:rounded-card">
+      <div className="relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-card border border-paper-line bg-paper-card px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5 shadow-card sm:max-w-md sm:rounded-card sm:pb-5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-ink">{title}</h2>
           <button

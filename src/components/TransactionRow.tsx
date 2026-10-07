@@ -16,7 +16,7 @@ export function TransactionRow({ transaction, showDate = false, onEdit, onDelete
   const isIncome = transaction.type === "income";
 
   return (
-    <div className="group flex items-center gap-3 border-b border-paper-line/70 py-3 last:border-0">
+    <div className="group flex items-center gap-2 border-b border-paper-line/70 py-3 last:border-0 sm:gap-3">
       <div
         className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
           isIncome ? "bg-ledger-50 text-ledger-600" : "bg-rust-50 text-rust-500"
@@ -27,8 +27,8 @@ export function TransactionRow({ transaction, showDate = false, onEdit, onDelete
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-ink">{transaction.description || categoryName}</p>
-        <p className="flex items-center gap-1 text-xs text-ink-faint">
-          {categoryName}
+        <p className="flex min-w-0 items-center gap-1 text-xs text-ink-faint">
+          <span className="truncate">{categoryName}</span>
           {showDate && <span>· {formatDateID(transaction.transaction_date)}</span>}
           {transaction.source === "telegram" && (
             <span className="ml-1 inline-flex items-center gap-0.5 text-ledger-500">
@@ -38,17 +38,17 @@ export function TransactionRow({ transaction, showDate = false, onEdit, onDelete
         </p>
       </div>
 
-      <p className={`font-mono text-sm font-semibold tabular-nums ${isIncome ? "text-ledger-600" : "text-rust-500"}`}>
+      <p className={`max-w-[38%] shrink-0 break-words text-right font-mono text-[11px] font-semibold leading-tight tabular-nums sm:max-w-none sm:text-sm ${isIncome ? "text-ledger-600" : "text-rust-500"}`}>
         {formatSignedRupiah(transaction.amount, transaction.type)}
       </p>
 
       {(onEdit || onDelete) && (
-        <div className="flex flex-shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex flex-shrink-0 gap-0.5 opacity-100 transition-opacity sm:gap-1 sm:opacity-0 sm:group-hover:opacity-100">
           {onEdit && (
             <button
               onClick={() => onEdit(transaction)}
               aria-label="Edit transaksi"
-              className="rounded-md p-1.5 text-ink-faint hover:bg-paper-line/60 hover:text-ink"
+              className="rounded-md p-1 text-ink-faint hover:bg-paper-line/60 hover:text-ink sm:p-1.5"
             >
               <IconEdit width={15} height={15} />
             </button>
@@ -57,7 +57,7 @@ export function TransactionRow({ transaction, showDate = false, onEdit, onDelete
             <button
               onClick={() => onDelete(transaction)}
               aria-label="Hapus transaksi"
-              className="rounded-md p-1.5 text-ink-faint hover:bg-rust-50 hover:text-rust-500"
+              className="rounded-md p-1 text-ink-faint hover:bg-rust-50 hover:text-rust-500 sm:p-1.5"
             >
               <IconTrash width={15} height={15} />
             </button>

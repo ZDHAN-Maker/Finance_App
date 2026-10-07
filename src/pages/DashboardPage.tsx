@@ -220,7 +220,7 @@ export function DashboardPage() {
 
   return (
     <Layout>
-      <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-semibold text-ink">Dashboard</h1>
         <MonthPicker monthKey={monthKey} onChange={setMonthKey} />
       </div>
@@ -237,15 +237,15 @@ export function DashboardPage() {
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-card border border-paper-line bg-paper-card p-4">
+        <div className="min-w-0 rounded-card border border-paper-line bg-paper-card p-3 sm:p-4">
           <p className="text-xs font-medium text-ink-faint">Pemasukan bulan ini</p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-ledger-600">
+          <p className="mt-1 break-words font-mono text-xs font-semibold tabular-nums text-ledger-600 sm:text-lg">
             {formatRupiah(monthly?.total_income ?? 0)}
           </p>
         </div>
-        <div className="rounded-card border border-paper-line bg-paper-card p-4">
+        <div className="min-w-0 rounded-card border border-paper-line bg-paper-card p-3 sm:p-4">
           <p className="text-xs font-medium text-ink-faint">Pengeluaran bulan ini</p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-rust-500">
+          <p className="mt-1 break-words font-mono text-xs font-semibold tabular-nums text-rust-500 sm:text-lg">
             {formatRupiah(monthly?.total_expense ?? 0)}
           </p>
         </div>
@@ -436,7 +436,7 @@ export function DashboardPage() {
                     </p>
                   )}
 
-                  <div className="mb-3 grid grid-cols-3 gap-2 text-center text-[11px] text-ink-faint">
+                  <div className="mb-3 grid grid-cols-1 gap-2 text-center text-[11px] text-ink-faint sm:grid-cols-3">
                     <div className="rounded-lg bg-white px-2 py-1.5">
                       <div className="font-semibold text-ink">{formatRupiah(history.total)}</div>
                       <div>Total setor</div>
@@ -645,7 +645,7 @@ export function DashboardPage() {
       <button
         onClick={() => setShowAddForm(true)}
         aria-label="Tambah transaksi"
-        className="fixed bottom-20 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-ledger-500 text-white shadow-card hover:bg-ledger-600 md:bottom-8 md:right-8"
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-ledger-500 text-white shadow-card hover:bg-ledger-600 md:bottom-8 md:right-8"
       >
         <IconPlus width={22} height={22} />
       </button>

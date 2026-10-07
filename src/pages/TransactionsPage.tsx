@@ -35,7 +35,7 @@ export function TransactionsPage() {
 
   return (
     <Layout>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-semibold text-ink">Riwayat</h1>
         <MonthPicker monthKey={monthKey} onChange={setMonthKey} />
       </div>
@@ -54,7 +54,7 @@ export function TransactionsPage() {
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="rounded-lg border border-paper-line bg-paper-card px-3 py-2 text-sm focus:border-ledger-500"
+          className="w-full rounded-lg border border-paper-line bg-paper-card px-3 py-2 text-sm focus:border-ledger-500 sm:w-auto"
         >
           <option value="">Semua kategori</option>
           {categories.map((c) => (
@@ -95,7 +95,7 @@ export function TransactionsPage() {
       <button
         onClick={() => setShowAddForm(true)}
         aria-label="Tambah transaksi"
-        className="fixed bottom-20 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-ledger-500 text-white shadow-card hover:bg-ledger-600 md:bottom-8 md:right-8"
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-ledger-500 text-white shadow-card hover:bg-ledger-600 md:bottom-8 md:right-8"
       >
         <IconPlus width={22} height={22} />
       </button>

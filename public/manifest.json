@@ -1,6 +1,6 @@
 {
-  "name": "Kas — Catatan Keuangan",
-  "short_name": "Kas",
+  "name": "D'Cash — Catatan Keuangan",
+  "short_name": "D'Cash",
   "description": "Catat pemasukan dan pengeluaran lewat Telegram, pantau lewat dashboard.",
   "start_url": "/dashboard",
   "scope": "/",

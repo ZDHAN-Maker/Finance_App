@@ -11,7 +11,7 @@ export function MonthPicker({ monthKey, onChange }: { monthKey: string; onChange
       >
         <IconChevronLeft width={16} height={16} />
       </button>
-      <span className="min-w-[9.5rem] text-center text-sm font-medium capitalize text-ink">
+      <span className="min-w-32 text-center text-sm font-medium capitalize text-ink sm:min-w-[9.5rem]">
         {monthKeyLabel(monthKey)}
       </span>
       <button

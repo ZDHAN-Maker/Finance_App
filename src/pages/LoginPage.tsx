@@ -37,9 +37,9 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-ledger-500 font-display text-lg font-semibold text-white">
-            K
+            D
           </div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Kas</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">D'Cash</h1>
           <p className="mt-1 text-sm text-ink-faint">Catat lewat Telegram, pantau lewat sini.</p>
         </div>
 
