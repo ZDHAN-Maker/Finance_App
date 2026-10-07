@@ -14,8 +14,9 @@ import { useCategories } from "../hooks/useCategories";
 import { useSavingsGoals } from "../hooks/useSavingsGoals";
 import { currentMonthKey } from "../utils/formatDate";
 import { formatRupiah } from "../utils/formatCurrency";
-import { calculateGoalProgress, summarizeGoalHistory, summarizeSavingsTrend } from "../utils/savingsGoals";
-import { getBudgetHealth, getBudgetSplit } from "../utils/budgetInsight";
+import { calculateGoalProgress, summarizeGoalHistory, summarizeGoalPriority, summarizeSavingsPortfolio, summarizeSavingsTrend } from "../utils/savingsGoals";
+import { getBudgetHealth, getCashFlowForecast, getBudgetSplit, getDailySpendingGuide, getFinancialHealthSummary, getSpendingInsight } from "../utils/budgetInsight";
+import { getNextRecurringDepositDate } from "../utils/savingsGoals";
 import { IconPlus, IconTrash } from "../components/Icons";
 
 function formatDate(idDate: string) {
@@ -92,12 +93,46 @@ export function DashboardPage() {
     () => summarizeSavingsTrend(goals.flatMap((goal) => goal.history ?? []), 6),
     [goals]
   );
+  const savingsPortfolio = useMemo(() => summarizeSavingsPortfolio(goals), [goals]);
+  const goalPriorities = useMemo(() => summarizeGoalPriority(goals), [goals]);
+  const priorityGoal = goalPriorities[0];
   const maxTrendValue = Math.max(...savingsTrend.map((item) => item.total), 1);
 
   const budgetStatus = getBudgetHealth(
     monthly?.total_income ?? 0,
     monthly?.total_expense ?? 0,
     budgetLimit || baseBudget.budgetLimitDefault
+  );
+  const financialHealth = useMemo(
+    () =>
+      getFinancialHealthSummary(
+        monthly?.total_income ?? 0,
+        monthly?.total_expense ?? 0,
+        savingsPortfolio.totalProgressPercent,
+        budgetLimit || baseBudget.budgetLimitDefault
+      ),
+    [monthly?.total_income, monthly?.total_expense, savingsPortfolio.totalProgressPercent, budgetLimit, baseBudget.budgetLimitDefault]
+  );
+  const dailyGuide = useMemo(
+    () => getDailySpendingGuide(monthly?.total_income ?? 0, monthly?.total_expense ?? 0, budgetLimit || baseBudget.budgetLimitDefault, 30),
+    [monthly?.total_income, monthly?.total_expense, budgetLimit, baseBudget.budgetLimitDefault]
+  );
+  const nextRecurringGoal = useMemo(
+    () => goals.filter((goal) => Number(goal.recurringAmount ?? 0) > 0 && Number(goal.recurringDay ?? 0) > 0).sort((a, b) => {
+      const aDate = getNextRecurringDepositDate(a).getTime();
+      const bDate = getNextRecurringDepositDate(b).getTime();
+      return aDate - bDate;
+    })[0],
+    [goals]
+  );
+  const nextRecurringDate = nextRecurringGoal ? getNextRecurringDepositDate(nextRecurringGoal) : null;
+  const cashFlowForecast = useMemo(
+    () => getCashFlowForecast(monthly?.total_income ?? 0, monthly?.total_expense ?? 0, total?.balance ?? 0),
+    [monthly?.total_income, monthly?.total_expense, total?.balance]
+  );
+  const spendingInsight = useMemo(
+    () => getSpendingInsight(monthly?.total_income ?? 0, categoryBreakdown?.breakdown ?? []),
+    [monthly?.total_income, categoryBreakdown?.breakdown]
   );
 
   useEffect(() => {
@@ -216,7 +251,99 @@ export function DashboardPage() {
         </div>
       </div>
 
+      <section className="mt-4 rounded-card border border-paper-line bg-paper-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-ink-faint">Kesehatan finansial</p>
+            <h2 className="mt-1 font-display text-lg font-semibold text-ink">{financialHealth.label}</h2>
+          </div>
+          <div className="rounded-full bg-ledger-100 px-2.5 py-1 text-sm font-semibold text-ledger-700">
+            {financialHealth.score}/100
+          </div>
+        </div>
+
+        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-paper">
+          <div
+            className="h-full rounded-full bg-ledger-500"
+            style={{ width: `${financialHealth.score}%` }}
+          />
+        </div>
+
+        <p className="mt-3 text-sm text-ink-faint">{financialHealth.message}</p>
+        <p className="mt-2 text-sm font-medium text-ink">Aksi: {financialHealth.nextAction}</p>
+      </section>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-card border border-paper-line bg-paper-card p-4">
+          <p className="text-[11px] uppercase tracking-wide text-ink-faint">Panduan belanja hari ini</p>
+          <p className="mt-2 text-xl font-semibold text-ink">{formatRupiah(dailyGuide.dailyAllowance)}</p>
+          <p className="mt-1 text-sm text-ink-faint">{dailyGuide.message}</p>
+        </div>
+        <div className="rounded-card border border-paper-line bg-paper-card p-4">
+          <p className="text-[11px] uppercase tracking-wide text-ink-faint">Setoran otomatis berikutnya</p>
+          {nextRecurringGoal && nextRecurringDate ? (
+            <>
+              <p className="mt-2 text-xl font-semibold text-ink">{nextRecurringGoal.name}</p>
+              <p className="mt-1 text-sm text-ink-faint">{nextRecurringDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
+              <p className="mt-2 text-sm font-medium text-ledger-700">{formatRupiah(Number(nextRecurringGoal.recurringAmount ?? 0))}</p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-ink-faint">Belum ada target dengan setoran otomatis aktif.</p>
+          )}
+        </div>
+      </div>
+
       <section className="mt-6 rounded-card border border-paper-line bg-paper-card p-5">
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl bg-ledger-50 p-3">
+            <p className="text-[11px] uppercase tracking-wide text-ledger-700">Total target</p>
+            <p className="mt-2 text-lg font-semibold text-ink">{formatRupiah(savingsPortfolio.totalTarget)}</p>
+            <p className="text-xs text-ink-faint">{savingsPortfolio.activeGoals} target aktif</p>
+          </div>
+          <div className="rounded-2xl bg-paper p-3">
+            <p className="text-[11px] uppercase tracking-wide text-ink-faint">Total terkumpul</p>
+            <p className="mt-2 text-lg font-semibold text-ink">{formatRupiah(savingsPortfolio.totalSaved)}</p>
+            <p className="text-xs text-ink-faint">{savingsPortfolio.totalProgressPercent}% dari total target</p>
+          </div>
+          <div className="rounded-2xl bg-rust-50 p-3">
+            <p className="text-[11px] uppercase tracking-wide text-rust-600">Sisa total</p>
+            <p className="mt-2 text-lg font-semibold text-ink">{formatRupiah(savingsPortfolio.remainingAmount)}</p>
+            <p className="text-xs text-ink-faint">{savingsPortfolio.completedGoals} target selesai</p>
+          </div>
+        </div>
+
+        {priorityGoal && (
+          <div className="mb-5 rounded-2xl border border-ledger-200 bg-ledger-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-ledger-700">Prioritas target</p>
+                <h3 className="mt-1 text-lg font-semibold text-ink">{priorityGoal.name}</h3>
+              </div>
+              <span className="rounded-full bg-ledger-100 px-2 py-1 text-[10px] font-semibold text-ledger-700">
+                {priorityGoal.urgencyScore}/100
+              </span>
+            </div>
+
+            <p className="mt-2 text-sm text-ink-faint">{priorityGoal.reason}</p>
+
+            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-ledger-100">
+              <div
+                className="h-full rounded-full bg-ledger-500"
+                style={{ width: `${Math.min(priorityGoal.progressPercent, 100)}%` }}
+              />
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs text-ink-faint">
+              <span>{priorityGoal.progressPercent}% tercapai</span>
+              <span>{priorityGoal.daysLeft} hari lagi</span>
+            </div>
+
+            <p className="mt-3 text-sm font-medium text-ink">
+              Saran setoran: {formatRupiah(priorityGoal.requiredMonthly)} / bulan
+            </p>
+          </div>
+        )}
+
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-display text-base font-semibold text-ink">Target tabungan</h2>
           <button
@@ -408,7 +535,7 @@ export function DashboardPage() {
       <section className="mt-6 rounded-card border border-paper-line bg-paper-card p-5">
         <h2 className="mb-4 font-display text-base font-semibold text-ink">Insight & rencana anggaran</h2>
 
-        <div className="mb-4 grid gap-3 md:grid-cols-3">
+        <div className="mb-4 grid gap-3 md:grid-cols-4">
           <div className="rounded-2xl bg-ledger-50 p-3">
             <p className="text-[11px] uppercase tracking-wide text-ledger-700">Target utama</p>
             <p className="mt-2 text-lg font-semibold text-ink">{activeGoal ? activeGoal.name : "Belum ada"}</p>
@@ -424,11 +551,24 @@ export function DashboardPage() {
               <p>Tabungan: {formatRupiah(baseBudget.split.saving)}</p>
             </div>
           </div>
+          <div className="rounded-2xl bg-ledger-50 p-3">
+            <p className="text-[11px] uppercase tracking-wide text-ledger-700">Proyeksi akhir bulan</p>
+            <p className="mt-2 text-lg font-semibold text-ink">{formatRupiah(cashFlowForecast.projectedEndBalance)}</p>
+            <p className="text-xs text-ink-faint">{cashFlowForecast.message}</p>
+          </div>
           <div className="rounded-2xl bg-rust-50 p-3">
             <p className="text-[11px] uppercase tracking-wide text-rust-600">Status anggaran</p>
             <p className="mt-2 text-lg font-semibold text-ink">{budgetStatus.status === "aman" ? "Aman" : budgetStatus.status === "hati-hati" ? "Hati-hati" : "Over budget"}</p>
             <p className="text-xs text-ink-faint">{budgetStatus.message}</p>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-paper-line bg-paper p-4">
+          <p className="text-[11px] uppercase tracking-wide text-ink-faint">Insight pengeluaran</p>
+          <p className="mt-2 text-lg font-semibold text-ink">{spendingInsight.topCategory}</p>
+          <p className="mt-1 text-sm text-ink-faint">{formatRupiah(spendingInsight.topCategoryAmount)} dari total pengeluaran bulan ini.</p>
+          <p className="mt-3 text-xs text-ledger-700">{spendingInsight.action}</p>
+          <p className="mt-2 text-[11px] text-ink-soft">{spendingInsight.recommendation}</p>
         </div>
 
         <div className="rounded-2xl border border-paper-line bg-paper p-4">

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { calculateGoalProgress, getRequiredContribution, shouldApplyRecurringDeposit, summarizeGoalHistory, summarizeSavingsTrend } from "./savingsGoals";
+import { calculateGoalProgress, getNextRecurringDepositDate, getRequiredContribution, shouldApplyRecurringDeposit, summarizeGoalHistory, summarizeGoalPriority, summarizeSavingsPortfolio, summarizeSavingsTrend } from "./savingsGoals";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -103,4 +103,34 @@ test("calculateGoalProgress menyediakan estimasi tanggal selesai yang valid", ()
   const parsed = new Date(`${result.estimatedFinishDate}T00:00:00`);
   assert.ok(!Number.isNaN(parsed.getTime()));
   assert.ok(parsed.getTime() >= Date.now());
+});
+
+test("summarizeSavingsPortfolio menghitung total progress tabungan semua target", () => {
+  const result = summarizeSavingsPortfolio([
+    { id: "1", name: "Dana darurat", targetAmount: 10000000, currentAmount: 6000000, deadline: "2027-01-31", reminderDays: 7, createdAt: "2026-01-01T00:00:00.000Z" },
+    { id: "2", name: "Liburan", targetAmount: 6000000, currentAmount: 3000000, deadline: "2027-02-15", reminderDays: 7, createdAt: "2026-01-01T00:00:00.000Z" },
+  ]);
+
+  assert.equal(result.totalTarget, 16000000);
+  assert.equal(result.totalSaved, 9000000);
+  assert.equal(result.totalProgressPercent, 56);
+  assert.equal(result.activeGoals, 2);
+});
+
+test("summarizeGoalPriority mengurutkan target yang paling mendesak dengan rekomendasi yang jelas", () => {
+  const result = summarizeGoalPriority([
+    { id: "1", name: "Dana darurat", targetAmount: 15000000, currentAmount: 4000000, deadline: "2026-10-20", reminderDays: 7, createdAt: "2026-01-01T00:00:00.000Z" },
+    { id: "2", name: "Liburan", targetAmount: 12000000, currentAmount: 9000000, deadline: "2027-02-15", reminderDays: 14, createdAt: "2026-01-01T00:00:00.000Z" },
+  ]);
+
+  assert.equal(result[0].id, "1");
+  assert.ok(result[0].reason.toLowerCase().includes("prioritas") || result[0].reason.toLowerCase().includes("mendesak"));
+  assert.ok(result[0].requiredMonthly > 0);
+});
+
+test("getNextRecurringDepositDate menghitung tanggal setoran otomatis berikutnya", () => {
+  const result = getNextRecurringDepositDate({ recurringAmount: 500000, recurringDay: 15 }, new Date("2026-10-07T08:00:00"));
+
+  assert.equal(result.getDate(), 15);
+  assert.equal(result.getMonth(), 9);
 });

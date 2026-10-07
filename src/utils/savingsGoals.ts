@@ -85,6 +85,26 @@ export function shouldApplyRecurringDeposit(goal: Pick<SavingsGoal, "recurringAm
   return date.getDate() === day;
 }
 
+export interface SavingsPortfolioSummary {
+  totalTarget: number;
+  totalSaved: number;
+  totalProgressPercent: number;
+  activeGoals: number;
+  completedGoals: number;
+  remainingAmount: number;
+}
+
+export interface GoalPrioritySummary {
+  id: string;
+  name: string;
+  remainingAmount: number;
+  progressPercent: number;
+  daysLeft: number;
+  requiredMonthly: number;
+  urgencyScore: number;
+  reason: string;
+}
+
 export interface SavingsTrendPoint {
   month: string;
   label: string;
@@ -201,4 +221,85 @@ export function calculateGoalProgress(goal: SavingsGoal): SavingsGoalProgress {
     estimatedFinishDate,
     message: `${contribution.message}${estimatedText}`,
   };
+}
+
+export function summarizeSavingsPortfolio(goals: SavingsGoal[] = []): SavingsPortfolioSummary {
+  const safeGoals = Array.isArray(goals) ? goals : [];
+  const totalTarget = safeGoals.reduce((sum, goal) => sum + Math.max(goal.targetAmount, 0), 0);
+  const totalSaved = safeGoals.reduce((sum, goal) => sum + Math.max(goal.currentAmount, 0), 0);
+  const remainingAmount = Math.max(totalTarget - totalSaved, 0);
+  const activeGoals = safeGoals.length;
+  const completedGoals = safeGoals.filter((goal) => goal.currentAmount >= goal.targetAmount).length;
+  const totalProgressPercent = totalTarget === 0 ? 0 : Math.min(Math.round((totalSaved / totalTarget) * 100), 100);
+
+  return {
+    totalTarget,
+    totalSaved,
+    totalProgressPercent,
+    activeGoals,
+    completedGoals,
+    remainingAmount,
+  };
+}
+
+export function getNextRecurringDepositDate(goal: Pick<SavingsGoal, "recurringAmount" | "recurringDay">, date = new Date()) {
+  const amount = Number(goal.recurringAmount ?? 0);
+  const day = Number(goal.recurringDay ?? 0);
+
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(day) || day < 1 || day > 31) {
+    const fallback = new Date(date);
+    fallback.setDate(1);
+    fallback.setHours(0, 0, 0, 0);
+    return fallback;
+  }
+
+  const candidate = new Date(date);
+  candidate.setHours(0, 0, 0, 0);
+  candidate.setDate(day);
+
+  if (candidate.getTime() <= date.getTime()) {
+    candidate.setMonth(candidate.getMonth() + 1);
+  }
+
+  return candidate;
+}
+
+export function summarizeGoalPriority(goals: SavingsGoal[] = []): GoalPrioritySummary[] {
+  const safeGoals = Array.isArray(goals) ? goals : [];
+
+  return safeGoals
+    .map((goal) => {
+      const progress = calculateGoalProgress(goal);
+      const ratio = Math.max(goal.targetAmount, 1) === 0 ? 0 : (progress.remainingAmount / Math.max(goal.targetAmount, 1)) * 100;
+      const urgencyScore = Math.min(
+        Math.round(
+          ratio * 0.7 +
+            Math.max(0, 30 - progress.daysLeft) * 1.8 +
+            (progress.status === "late" ? 25 : progress.status === "warning" ? 15 : 0)
+        ),
+        100
+      );
+
+      const reason =
+        progress.status === "late"
+          ? "Prioritas mendesak: target sudah terlambat dan butuh fokus setoran cepat."
+          : progress.daysLeft <= 14
+            ? "Prioritas mendesak: tenggat tinggal sedikit, perlu kontribusi yang lebih besar."
+            : progress.progressPercent < 50
+              ? "Prioritas tinggi: target masih jauh dari target dan perlu konsistensi deposit."
+              : "Prioritas sedang: target tetap relevan, cukup jaga ritme setoran agar tidak tertinggal.";
+
+      return {
+        id: goal.id,
+        name: goal.name,
+        remainingAmount: progress.remainingAmount,
+        progressPercent: progress.progressPercent,
+        daysLeft: progress.daysLeft,
+        requiredMonthly: progress.requiredMonthly,
+        urgencyScore,
+        reason,
+      };
+    })
+    .filter((goal) => goal.remainingAmount > 0)
+    .sort((a, b) => b.urgencyScore - a.urgencyScore || a.daysLeft - b.daysLeft);
 }
