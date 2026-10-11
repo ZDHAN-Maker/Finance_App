@@ -1,4 +1,6 @@
 import type { SavingsGoal } from "./savingsGoals";
+import { api } from "../services/api";
+import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 
 export interface AiBudgetPlan {
   id: string;
@@ -159,6 +161,46 @@ export function applyAiPlan(plan: AiBudgetPlan): { success: boolean; goalId: str
 
   // 4. Pancarkan event agar Dashboard dan useSavingsGoals langsung re-render secara instan
   window.dispatchEvent(new CustomEvent("kas-data-updated", { detail: historyItem }));
+
+  // 5. Sinkronisasi ke server Supabase jika user sedang login
+  if (typeof window !== "undefined" && isSupabaseConfigured) {
+    void (async () => {
+      try {
+        const { data: authData } = await supabase.auth.getSession();
+        if (!authData?.session) return;
+
+        const res = await api.post<{ data: { id: string } }>("/savings-goals", {
+          name: nextGoal.name,
+          target_amount: nextGoal.targetAmount,
+          current_amount: nextGoal.currentAmount,
+          deadline: nextGoal.deadline,
+          reminder_days: nextGoal.reminderDays,
+          recurring_amount: nextGoal.recurringAmount,
+          recurring_day: nextGoal.recurringDay,
+          history: nextGoal.history,
+        });
+
+        if (res?.data?.id && res.data.id !== goalId) {
+          const serverId = res.data.id;
+          const raw = localStorage.getItem(GOALS_STORAGE_KEY);
+          if (raw) {
+            const list = JSON.parse(raw) as SavingsGoal[];
+            const updated = list.map((g) => (g.id === goalId ? { ...g, id: serverId } : g));
+            localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(updated));
+          }
+          const rawHistory = localStorage.getItem(PLANS_HISTORY_KEY);
+          if (rawHistory) {
+            const hList = JSON.parse(rawHistory) as AiBudgetPlan[];
+            const updatedH = hList.map((h) => (h.id === goalId ? { ...h, id: serverId } : h));
+            localStorage.setItem(PLANS_HISTORY_KEY, JSON.stringify(updatedH));
+          }
+        }
+      } catch (err) {
+        // Fallback lokal tetap aman dan aktif
+        console.warn("Sinkronisasi cloud target AI ditangguhkan (tersimpan di lokal):", err);
+      }
+    })();
+  }
 
   return { success: true, goalId };
 }
