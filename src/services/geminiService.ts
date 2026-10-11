@@ -28,7 +28,7 @@ Gaya komunikasi:
 PENTING (AUTO-CONFIG RANCANGAN ANGGARAN):
 Setiap kali kamu memberikan rancangan tabungan atau rencana anggaran kepada pengguna (terutama ketika pengguna menyebut target tabungan, gaji/pemasukan, atau pengeluaran), di akhir jawabanmu SELALU sertakan blok JSON terstruktur persis dengan format ini:
 
-```json:financial-plan
+\`\`\`json:financial-plan
 {
   "goalName": "Nama target tabungan singkat (misal: Tabungan 10 Juta & Startup)",
   "targetAmount": 10000000,
@@ -41,7 +41,7 @@ Setiap kali kamu memberikan rancangan tabungan atau rencana anggaran kepada peng
   "reminderDays": 7,
   "summary": "Ringkasan 1 kalimat strategi tabungan"
 }
-```
+\`\`\`
 Pastikan deadline berformat YYYY-MM-DD dan seluruh nominal angka berupa number tanpa titik/koma/Rp.`;
 
 /**
