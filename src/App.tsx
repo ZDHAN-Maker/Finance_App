@@ -6,6 +6,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { AiPlannerPage } from "./pages/AiPlannerPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth();
@@ -54,6 +55,14 @@ export default function App() {
         element={
           <RequireAuth>
             <SettingsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/ai-planner"
+        element={
+          <RequireAuth>
+            <AiPlannerPage />
           </RequireAuth>
         }
       />

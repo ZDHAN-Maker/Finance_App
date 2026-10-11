@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { BottomNav, SideNav } from "./BottomNav";
+import { AiChatWidget } from "./AiChatWidget";
 
 export function Layout({ children, title }: { children: ReactNode; title?: string }) {
   return (
@@ -14,6 +15,7 @@ export function Layout({ children, title }: { children: ReactNode; title?: strin
         </main>
       </div>
       <BottomNav />
+      <AiChatWidget />
     </div>
   );
 }

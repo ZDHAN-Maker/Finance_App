@@ -132,3 +132,13 @@ export function IconCoin(props: IconProps) {
     </svg>
   );
 }
+
+export function IconSparkle(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5Z" />
+      <path d="M19 3l.8 2.2L22 6l-2.2.8L19 9l-.8-2.2L16 6l2.2-.8Z" />
+      <path d="M5 17l.6 1.4L7 19l-1.4.6L5 21l-.6-1.4L3 19l1.4-.6Z" />
+    </svg>
+  );
+}

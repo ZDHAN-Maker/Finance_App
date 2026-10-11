@@ -17,7 +17,9 @@ import { formatRupiah } from "../utils/formatCurrency";
 import { calculateGoalProgress, summarizeGoalHistory, summarizeGoalPriority, summarizeSavingsPortfolio, summarizeSavingsTrend } from "../utils/savingsGoals";
 import { getBudgetHealth, getCashFlowForecast, getBudgetSplit, getDailySpendingGuide, getFinancialHealthSummary, getSpendingInsight } from "../utils/budgetInsight";
 import { getNextRecurringDepositDate } from "../utils/savingsGoals";
-import { IconPlus, IconTrash } from "../components/Icons";
+import { IconPlus, IconTrash, IconSparkle } from "../components/Icons";
+import { getAiPlanHistory, updateAiPlanStatus, type AiBudgetPlan } from "../utils/aiPlanManager";
+import { useNavigate } from "react-router-dom";
 
 function formatDate(idDate: string) {
   return new Date(`${idDate}T00:00:00`).toLocaleDateString("id-ID", {
@@ -44,11 +46,35 @@ export function DashboardPage() {
   const [goalRecurringDay, setGoalRecurringDay] = useState(15);
   const [goalError, setGoalError] = useState<string | null>(null);
   const [depositInputs, setDepositInputs] = useState<Record<string, string>>({});
+  const [showAiHistoryModal, setShowAiHistoryModal] = useState(false);
+  const [aiPlans, setAiPlans] = useState<AiBudgetPlan[]>(() => getAiPlanHistory());
+  const [goalTab, setGoalTab] = useState<"all" | "active" | "completed">("all");
+  const navigate = useNavigate();
+
   const [budgetLimit, setBudgetLimit] = useState<number>(() => {
     if (typeof window === "undefined") return 0;
     const saved = Number(localStorage.getItem("kas-budget-limit") ?? "0");
     return Number.isFinite(saved) ? saved : 0;
   });
+
+  // Sinkronisasi otomatis saat AI menerapkan rancangan anggaran baru
+  useEffect(() => {
+    function handleDataSync() {
+      if (typeof window === "undefined") return;
+      const saved = Number(localStorage.getItem("kas-budget-limit") ?? "0");
+      if (Number.isFinite(saved) && saved > 0) {
+        setBudgetLimit(saved);
+      }
+      setAiPlans(getAiPlanHistory());
+    }
+
+    window.addEventListener("kas-data-updated", handleDataSync);
+    window.addEventListener("storage", handleDataSync);
+    return () => {
+      window.removeEventListener("kas-data-updated", handleDataSync);
+      window.removeEventListener("storage", handleDataSync);
+    };
+  }, []);
 
   const { total, monthly, categoryBreakdown, loading: summaryLoading, refetch: refetchSummary } = useSummary(monthKey);
   const { categories } = useCategories();
@@ -97,6 +123,16 @@ export function DashboardPage() {
   const goalPriorities = useMemo(() => summarizeGoalPriority(goals), [goals]);
   const priorityGoal = goalPriorities[0];
   const maxTrendValue = Math.max(...savingsTrend.map((item) => item.total), 1);
+
+  const filteredGoals = useMemo(() => {
+    if (goalTab === "active") {
+      return goals.filter((g) => calculateGoalProgress(g).status !== "done");
+    }
+    if (goalTab === "completed") {
+      return goals.filter((g) => calculateGoalProgress(g).status === "done");
+    }
+    return goals;
+  }, [goals, goalTab]);
 
   const budgetStatus = getBudgetHealth(
     monthly?.total_income ?? 0,
@@ -344,14 +380,60 @@ export function DashboardPage() {
           </div>
         )}
 
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-display text-base font-semibold text-ink">Target tabungan</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-display text-base font-semibold text-ink">Target tabungan</h2>
+            <p className="text-xs text-ink-faint">Kelola target & rancangan anggaran AI</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {aiPlans.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAiHistoryModal(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-ledger-200 bg-ledger-50 px-2.5 py-1.5 text-xs font-semibold text-ledger-700 hover:bg-ledger-100 transition-colors"
+              >
+                <IconSparkle width={13} height={13} />
+                <span>Riwayat AI ({aiPlans.length})</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowGoalForm(true)}
+              className="rounded-lg bg-ledger-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ledger-600"
+            >
+              + Target
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Filter Target: Semua / Aktif / Tercapai */}
+        <div className="mb-4 flex items-center gap-1 rounded-xl bg-paper p-1 text-xs">
           <button
             type="button"
-            onClick={() => setShowGoalForm(true)}
-            className="rounded-lg bg-ledger-500 px-3 py-2 text-xs font-semibold text-white hover:bg-ledger-600"
+            onClick={() => setGoalTab("all")}
+            className={`flex-1 rounded-lg py-1.5 font-medium transition-all ${
+              goalTab === "all" ? "bg-white text-ink shadow-2xs font-semibold" : "text-ink-faint hover:text-ink"
+            }`}
           >
-            + Target
+            Semua ({goals.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setGoalTab("active")}
+            className={`flex-1 rounded-lg py-1.5 font-medium transition-all ${
+              goalTab === "active" ? "bg-white text-ink shadow-2xs font-semibold" : "text-ink-faint hover:text-ink"
+            }`}
+          >
+            Aktif ({goals.filter((g) => calculateGoalProgress(g).status !== "done").length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setGoalTab("completed")}
+            className={`flex-1 rounded-lg py-1.5 font-medium transition-all ${
+              goalTab === "completed" ? "bg-white text-ink shadow-2xs font-semibold" : "text-ink-faint hover:text-ink"
+            }`}
+          >
+            Tercapai ({goals.filter((g) => calculateGoalProgress(g).status === "done").length})
           </button>
         </div>
 
@@ -365,14 +447,24 @@ export function DashboardPage() {
           </button>
         )}
 
-        {goals.length === 0 ? (
+        {filteredGoals.length === 0 ? (
           <EmptyState
-            title="Belum ada target tabungan"
-            description="Buat target agar kamu tahu kapan harus menabung dan berapa yang harus disetor."
+            title={
+              goalTab === "completed"
+                ? "Belum ada target yang tercapai"
+                : goalTab === "active"
+                  ? "Tidak ada target aktif saat ini"
+                  : "Belum ada target tabungan"
+            }
+            description={
+              goalTab === "completed"
+                ? "Target yang sudah 100% terkumpul akan muncul di sini sebagai riwayat."
+                : "Buat target agar kamu tahu kapan harus menabung dan berapa yang harus disetor."
+            }
           />
         ) : (
           <div className="space-y-3">
-            {goals.map((goal) => {
+            {filteredGoals.map((goal) => {
               const progress = calculateGoalProgress(goal);
               const history = summarizeGoalHistory(goal.history ?? []);
               const statusLabel =
@@ -645,7 +737,7 @@ export function DashboardPage() {
       <button
         onClick={() => setShowAddForm(true)}
         aria-label="Tambah transaksi"
-        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-ledger-500 text-white shadow-card hover:bg-ledger-600 md:bottom-8 md:right-8"
+        className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+8px)] right-20 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-ledger-500 text-white shadow-card hover:bg-ledger-600 md:bottom-6 md:right-20"
       >
         <IconPlus width={22} height={22} />
       </button>
@@ -755,6 +847,127 @@ export function DashboardPage() {
               Simpan target
             </button>
           </form>
+        </Modal>
+      )}
+
+      {showAiHistoryModal && (
+        <Modal title="Riwayat Rancangan Anggaran AI" onClose={() => setShowAiHistoryModal(false)}>
+          <div className="space-y-4">
+            <p className="text-xs text-ink-faint">
+              Daftar seluruh rancangan tabungan dan anggaran yang pernah disetujui & diterapkan oleh Gemini AI.
+            </p>
+
+            {aiPlans.length === 0 ? (
+              <EmptyState
+                title="Belum ada riwayat rancangan AI"
+                description="Gunakan fitur AI Keuangan atau AI Planner untuk membuat rancangan tabungan otomatis."
+              />
+            ) : (
+              <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                {aiPlans.map((plan) => {
+                  const isCompleted = plan.status === "completed";
+                  return (
+                    <div
+                      key={plan.id}
+                      className="rounded-2xl border border-paper-line bg-paper/60 p-3.5 space-y-2.5 transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-ink text-sm">{plan.goalName}</h3>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                isCompleted
+                                  ? "bg-ledger-100 text-ledger-700"
+                                  : "bg-ledger-50 text-ledger-600 border border-ledger-200"
+                              }`}
+                            >
+                              {isCompleted ? "🎉 Selesai / Tercapai" : "⚡ Aktif"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-ink-faint mt-0.5">
+                            Diterapkan:{" "}
+                            {plan.appliedAt
+                              ? new Date(plan.appliedAt).toLocaleDateString("id-ID", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
+                              : "—"}
+                          </p>
+                        </div>
+                        {!isCompleted && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateAiPlanStatus(plan.id, "completed");
+                              setAiPlans(getAiPlanHistory());
+                            }}
+                            className="rounded-lg border border-paper-line bg-white px-2 py-1 text-[11px] font-medium text-ink-soft hover:bg-paper hover:text-ledger-700"
+                          >
+                            Tandai selesai
+                          </button>
+                        )}
+                      </div>
+
+                      {plan.summary && (
+                        <p className="rounded-xl bg-white p-2 text-[11px] text-ink-soft border border-paper-line/60">
+                          💡 {plan.summary}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div className="rounded-xl bg-white p-2 border border-paper-line/60">
+                          <span className="text-[10px] text-ink-faint block">Target Tabungan</span>
+                          <span className="font-mono font-semibold text-ledger-700">
+                            {formatRupiah(plan.targetAmount)}
+                          </span>
+                        </div>
+                        <div className="rounded-xl bg-white p-2 border border-paper-line/60">
+                          <span className="text-[10px] text-ink-faint block">Batas Belanja Bulanan</span>
+                          <span className="font-mono font-semibold text-rust-600">
+                            {formatRupiah(plan.monthlyBudgetLimit)}
+                          </span>
+                        </div>
+                        <div className="rounded-xl bg-white p-2 border border-paper-line/60">
+                          <span className="text-[10px] text-ink-faint block">Auto-Save Rutin</span>
+                          <span className="font-mono font-semibold text-ink">
+                            {formatRupiah(plan.recurringAmount)} / bln
+                          </span>
+                        </div>
+                        <div className="rounded-xl bg-white p-2 border border-paper-line/60">
+                          <span className="text-[10px] text-ink-faint block">Target Selesai</span>
+                          <span className="font-medium text-ink">
+                            {plan.deadline
+                              ? new Date(`${plan.deadline}T00:00:00`).toLocaleDateString("id-ID", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAiHistoryModal(false);
+                  navigate("/ai-planner");
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-ledger-500 py-2.5 text-xs font-semibold text-white hover:bg-ledger-600 transition-colors"
+              >
+                <IconSparkle width={14} height={14} />
+                <span>+ Buat Rancangan Target Baru (AI Planner)</span>
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
     </Layout>

@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { IconHome, IconList, IconTag, IconSettings } from "./Icons";
+import { IconHome, IconList, IconTag, IconSettings, IconSparkle } from "./Icons";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: IconHome },
   { to: "/transactions", label: "Riwayat", icon: IconList },
+  { to: "/ai-planner", label: "AI Planner", icon: IconSparkle },
   { to: "/categories", label: "Kategori", icon: IconTag },
   { to: "/settings", label: "Pengaturan", icon: IconSettings },
 ];

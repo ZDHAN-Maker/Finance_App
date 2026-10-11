@@ -104,8 +104,28 @@ export function useSavingsGoals() {
       setPermission(Notification.permission);
     }
 
+    function handleSync() {
+      if (typeof window === "undefined") return;
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as SavingsGoal[];
+          if (Array.isArray(parsed)) {
+            setGoals(parsed.map(normalizeGoal));
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    window.addEventListener("kas-data-updated", handleSync);
+    window.addEventListener("storage", handleSync);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("kas-data-updated", handleSync);
+      window.removeEventListener("storage", handleSync);
     };
   }, []);
 
