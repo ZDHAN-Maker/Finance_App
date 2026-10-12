@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { sendChatMessage, type ChatMessage } from "../services/geminiService";
+import {
+  sendChatMessage,
+  type ChatMessage,
+  getGeminiApiKey,
+  setCustomGeminiApiKey,
+  hasGeminiApiKey,
+} from "../services/geminiService";
 import { IconSparkle, IconX, IconSend } from "./Icons";
 import { useLocation } from "react-router-dom";
 import { parseAiPlanFromText, stripPlanBlockFromText } from "../utils/aiPlanManager";
@@ -77,9 +83,22 @@ export function AiChatWidget() {
   const [error, setError] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showLimitInfo, setShowLimitInfo] = useState(false);
+  const [apiKeySet, setApiKeySet] = useState(() => hasGeminiApiKey());
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => getGeminiApiKey() ?? "");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const location = useLocation();
+
+  // Sync API key state
+  useEffect(() => {
+    const handleKeyUpdate = () => {
+      setApiKeySet(hasGeminiApiKey());
+      setApiKeyInput(getGeminiApiKey() ?? "");
+    };
+    window.addEventListener("kas-api-key-updated", handleKeyUpdate);
+    return () => window.removeEventListener("kas-api-key-updated", handleKeyUpdate);
+  }, []);
 
   // Hide on AI Planner page (it has its own dedicated UI)
   const hideOnRoute = location.pathname === "/ai-planner";
@@ -189,14 +208,31 @@ export function AiChatWidget() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold leading-tight text-white">AI Keuangan</p>
-                <button
-                  type="button"
-                  onClick={() => setShowLimitInfo((v) => !v)}
-                  className="flex items-center gap-1 text-[10px] text-ledger-200 hover:text-white"
-                >
-                  <span>{API_LIMIT_INFO.note}</span>
-                  <span className="rounded-full bg-white/15 px-1 text-[9px]">info limit</span>
-                </button>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowLimitInfo((v) => !v)}
+                    className="flex items-center gap-1 text-[10px] text-ledger-200 hover:text-white"
+                  >
+                    <span>{API_LIMIT_INFO.note}</span>
+                    <span className="rounded-full bg-white/15 px-1 text-[9px]">info limit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setApiKeyInput(getGeminiApiKey() ?? "");
+                      setShowApiKeyModal(true);
+                    }}
+                    className={`rounded-full px-1.5 py-0.2 text-[9px] font-medium transition-all ${
+                      apiKeySet
+                        ? "bg-white/15 text-white/90 hover:bg-white/25"
+                        : "bg-amber-300 text-amber-950 font-bold hover:bg-amber-200 animate-pulse"
+                    }`}
+                    title="Konfigurasi API Key Gemini"
+                  >
+                    {apiKeySet ? "🔑 Key" : "⚠️ Atur Key"}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
@@ -317,8 +353,27 @@ export function AiChatWidget() {
 
             {/* Error */}
             {error && (
-              <div className="rounded-xl border border-rust-200 bg-rust-50 px-3.5 py-2.5 text-xs text-rust-600">
-                {error}
+              <div className="rounded-xl border border-rust-200 bg-rust-50 p-3 text-xs text-rust-700 space-y-2">
+                <p className="font-semibold text-rust-800">⚠️ {error}</p>
+                {error.includes("VITE_GEMINI_API_KEY") && (
+                  <div className="pt-1.5 border-t border-rust-200/60 space-y-2">
+                    <p className="text-[11px] leading-relaxed text-rust-600">
+                      Jika di <strong>Vercel</strong>, tambahkan variabel <code>VITE_GEMINI_API_KEY</code> di menu Vercel &gt; Settings &gt; Environment Variables.
+                      <br />
+                      Atau masukkan API Key langsung di browser sekarang:
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setApiKeyInput(getGeminiApiKey() ?? "");
+                        setShowApiKeyModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-rust-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-rust-700 transition-colors"
+                    >
+                      🔑 Masukkan API Key Sekarang
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -367,9 +422,102 @@ export function AiChatWidget() {
             </div>
             <div className="mt-1 flex items-center justify-between px-1 text-[10px] text-ink-faint">
               <span>Shift+Enter untuk baris baru</span>
-              <span>Gemini 3.8 Flash</span>
+              <span>Gemini 2.5 / 3.8 Flash</span>
             </div>
           </div>
+
+          {/* ── API Key Configuration Modal ── */}
+          {showApiKeyModal && (
+            <div className="absolute inset-0 z-50 flex flex-col justify-end bg-black/40 backdrop-blur-[1px]">
+              <div className="rounded-t-2xl border-t border-paper-line bg-white p-4 shadow-xl">
+                <div className="flex items-center justify-between pb-2 border-b border-paper-line">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">🔑</span>
+                    <p className="text-xs font-semibold text-ink">Pengaturan Gemini API Key</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKeyModal(false)}
+                    className="rounded-full p-1 text-ink-faint hover:bg-paper"
+                  >
+                    <IconX width={13} height={13} />
+                  </button>
+                </div>
+
+                <div className="mt-3 space-y-2.5 text-xs">
+                  <p className="text-[11px] leading-relaxed text-ink-soft">
+                    {apiKeySet ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                        ✓ API Key saat ini terdeteksi aktif.
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
+                        ⚠️ API Key belum terhubung.
+                      </span>
+                    )}
+                    <br />
+                    Kamu bisa memasukkan API Key secara langsung di sini tanpa perlu rebuild Vercel.
+                  </p>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-ink-soft mb-1">
+                      Gemini API Key:
+                    </label>
+                    <input
+                      type="text"
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      placeholder="Contoh: AIzaSy... atau key Gemini kamu"
+                      className="w-full rounded-lg border border-paper-line bg-paper px-2.5 py-1.5 text-xs font-mono text-ink placeholder:text-ink-faint focus:border-ledger-500 focus:bg-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <a
+                      href="https://aistudio.google.com/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-ledger-600 hover:underline"
+                    >
+                      Dapatkan Key Gratis ↗
+                    </a>
+
+                    <div className="flex items-center gap-1.5">
+                      {apiKeySet && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomGeminiApiKey(null);
+                            setApiKeyInput("");
+                            setError(null);
+                            setShowApiKeyModal(false);
+                          }}
+                          className="rounded-lg px-2.5 py-1 text-[11px] text-rust-600 hover:bg-rust-50 transition-colors"
+                        >
+                          Hapus Key
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = apiKeyInput.trim();
+                          if (val) {
+                            setCustomGeminiApiKey(val);
+                            setError(null);
+                            setShowApiKeyModal(false);
+                          }
+                        }}
+                        disabled={!apiKeyInput.trim()}
+                        className="rounded-lg bg-ledger-500 px-3 py-1 text-[11px] font-semibold text-white hover:bg-ledger-600 disabled:opacity-40 transition-colors"
+                      >
+                        Simpan Key
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -222,7 +222,22 @@ export function AiPlannerPage() {
           </div>
 
           {error && (
-            <p className="rounded-lg bg-rust-50 px-3 py-2 text-sm text-rust-500">{error}</p>
+            <div className="rounded-lg bg-rust-50 p-3 text-sm text-rust-700 space-y-2">
+              <p className="font-semibold text-rust-800">⚠️ {error}</p>
+              {error.includes("VITE_GEMINI_API_KEY") && (
+                <div className="pt-2 border-t border-rust-200/60 flex items-center justify-between gap-2">
+                  <span className="text-xs text-rust-600">
+                    Kamu bisa mengatur API Key di halaman Pengaturan tanpa perlu redeploy.
+                  </span>
+                  <a
+                    href="/settings"
+                    className="shrink-0 rounded-md bg-rust-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rust-700"
+                  >
+                    Atur di Pengaturan ⚙️
+                  </a>
+                </div>
+              )}
+            </div>
           )}
 
           <div className="flex gap-2">

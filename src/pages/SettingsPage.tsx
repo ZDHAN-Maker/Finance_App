@@ -4,6 +4,11 @@ import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
 import type { AppUserProfile } from "../types";
 import { IconLogout, IconSend } from "../components/Icons";
+import {
+  getGeminiApiKey,
+  setCustomGeminiApiKey,
+  hasGeminiApiKey,
+} from "../services/geminiService";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -27,6 +32,9 @@ export function SettingsPage() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("unsupported");
   const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [installReady, setInstallReady] = useState(false);
+  const [apiKeyActive, setApiKeyActive] = useState(() => hasGeminiApiKey());
+  const [apiKeyInput, setApiKeyInput] = useState(() => getGeminiApiKey() ?? "");
+  const [geminiSavedMsg, setGeminiSavedMsg] = useState<string | null>(null);
 
   async function loadProfile() {
     setLoading(true);
@@ -163,6 +171,84 @@ export function SettingsPage() {
         )}
 
         {error && <p className="mt-3 text-sm text-rust-500">{error}</p>}
+      </section>
+
+      {/* ── Gemini AI Configuration ── */}
+      <section className="mb-4 rounded-card border border-paper-line bg-paper-card p-5">
+        <div className="flex items-center justify-between">
+          <p className="font-display text-base font-semibold text-ink">Gemini AI Keuangan</p>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              apiKeyActive
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-amber-100 text-amber-800"
+            }`}
+          >
+            {apiKeyActive ? "✓ Terhubung" : "Belum Diset"}
+          </span>
+        </div>
+
+        <p className="mt-2 text-sm text-ink-faint">
+          Kunci API untuk asisten chat finansial dan auto-planner tabungan cerdas.
+        </p>
+
+        <div className="mt-3 space-y-2">
+          <input
+            type="password"
+            value={apiKeyInput}
+            onChange={(e) => setApiKeyInput(e.target.value)}
+            placeholder="Tempelkan Gemini API Key kamu"
+            className="w-full rounded-lg border border-paper-line bg-paper px-3 py-2 text-sm font-mono text-ink placeholder:text-ink-faint focus:border-ledger-500 focus:bg-white focus:outline-none"
+          />
+
+          <div className="flex items-center justify-between pt-1">
+            <a
+              href="https://aistudio.google.com/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-ledger-600 hover:underline"
+            >
+              Dapatkan API Key gratis ↗
+            </a>
+
+            <div className="flex gap-2">
+              {apiKeyActive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomGeminiApiKey(null);
+                    setApiKeyInput("");
+                    setApiKeyActive(hasGeminiApiKey());
+                    setGeminiSavedMsg("API key dihapus.");
+                    setTimeout(() => setGeminiSavedMsg(null), 3000);
+                  }}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-rust-600 hover:bg-rust-50"
+                >
+                  Reset
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const val = apiKeyInput.trim();
+                  if (val) {
+                    setCustomGeminiApiKey(val);
+                    setApiKeyActive(true);
+                    setGeminiSavedMsg("API Key berhasil disimpan!");
+                    setTimeout(() => setGeminiSavedMsg(null), 3000);
+                  }
+                }}
+                disabled={!apiKeyInput.trim()}
+                className="rounded-lg bg-ledger-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-ledger-600 disabled:opacity-40"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+          {geminiSavedMsg && (
+            <p className="mt-1 text-xs text-emerald-600 font-medium">{geminiSavedMsg}</p>
+          )}
+        </div>
       </section>
 
       <section className="mb-4 rounded-card border border-paper-line bg-paper-card p-5">

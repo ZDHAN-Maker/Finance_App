@@ -1,6 +1,78 @@
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+const STORAGE_API_KEY = "kas-gemini-api-key";
+
+// Daftar model Gemini yang didukung dengan auto-failover (jika salah satu overload/503)
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-3.8-flash"];
+
+/**
+ * Mendapatkan API Key Gemini secara fleksibel:
+ * 1. Prioritas utama: Key kustom yang disimpan di browser / localStorage
+ * 2. Fallback: Environment variable VITE_GEMINI_API_KEY dari build/env
+ */
+export function getGeminiApiKey(): string | null {
+  if (typeof window !== "undefined") {
+    const custom = localStorage.getItem(STORAGE_API_KEY)?.trim();
+    if (custom) return custom;
+  }
+  const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim();
+  return envKey || null;
+}
+
+/**
+ * Menyimpan atau menghapus key kustom di browser (misal dari UI Pengaturan atau Chat).
+ */
+export function setCustomGeminiApiKey(key: string | null): void {
+  if (typeof window === "undefined") return;
+  if (!key || !key.trim()) {
+    localStorage.removeItem(STORAGE_API_KEY);
+  } else {
+    localStorage.setItem(STORAGE_API_KEY, key.trim());
+  }
+  window.dispatchEvent(new CustomEvent("kas-api-key-updated"));
+}
+
+export function hasGeminiApiKey(): boolean {
+  return Boolean(getGeminiApiKey());
+}
+
+/**
+ * Menjalankan request ke Gemini API dengan fallback otomatis ke model cadangan
+ * jika model utama mengalami 503 (high demand) atau error sementara.
+ */
+async function callGeminiApi(body: unknown, apiKey: string): Promise<string> {
+  let lastError: Error | null = null;
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as {
+          candidates?: { content?: { parts?: { text?: string }[] } }[];
+        };
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+        if (text) return text;
+      }
+
+      const errText = await res.text();
+      lastError = new Error(`Gemini (${model}) error ${res.status}: ${errText}`);
+
+      // Jika error 503 (high demand) atau 404/429, coba model alternatif
+      if (res.status === 503 || res.status === 404 || res.status === 429) {
+        continue;
+      }
+      throw lastError;
+    } catch (err) {
+      lastError = err as Error;
+    }
+  }
+
+  throw lastError ?? new Error("Gemini tidak dapat dihubungi. Coba lagi beberapa saat lagi.");
+}
 
 // ---------------------------------------------------------------------------
 // Free-form AI Chat
@@ -51,8 +123,11 @@ export async function sendChatMessage(
   history: ChatMessage[],
   userMessage: string
 ): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("VITE_GEMINI_API_KEY belum diset.");
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error(
+      "VITE_GEMINI_API_KEY belum diset. Silakan masukkan API Key di Pengaturan atau tombol Atur Key di atas."
+    );
   }
 
   const systemTurn = [
@@ -77,24 +152,7 @@ export async function sendChatMessage(
     generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
   };
 
-  const res = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini error ${res.status}: ${errText}`);
-  }
-
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-  if (!text) throw new Error("Gemini tidak merespons. Coba lagi.");
-  return text;
+  return callGeminiApi(body, apiKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,9 +244,10 @@ PENTING: Di baris paling akhir jawabanmu, sertakan blok konfigurasi ini secara p
 export async function generateSavingsPlan(
   input: SavingsPlanInput
 ): Promise<GeminiResponse> {
-  if (!GEMINI_API_KEY) {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
     throw new Error(
-      "VITE_GEMINI_API_KEY belum diset. Tambahkan ke file .env dan restart dev server."
+      "VITE_GEMINI_API_KEY belum diset. Tambahkan ke Vercel Environment Variables jika di hosting, atau atur API key di Pengaturan."
     );
   }
 
@@ -204,28 +263,7 @@ export async function generateSavingsPlan(
     },
   };
 
-  const res = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${errText}`);
-  }
-
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-
-  const text =
-    data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-
-  if (!text) {
-    throw new Error("Gemini tidak mengembalikan teks. Coba lagi.");
-  }
-
+  const text = await callGeminiApi(body, apiKey);
   return { plan: text, fromApi: true };
 }
 
