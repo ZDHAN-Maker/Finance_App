@@ -4,25 +4,38 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Palet "buku kas" — kertas hangat, tinta hijau ledger, aksen rust
-        // untuk pengeluaran. Sengaja dijaga tetap kecil (5 warna inti).
+        // Palet Maroon elegan (selaras dengan D'GYM) — kertas hangat rose, tinta crimson maroon, aksen rust
         paper: {
-          DEFAULT: "#F5F6F0",
+          DEFAULT: "#FAF5F6",
           card: "#FFFFFF",
-          line: "#E1DED0",
+          line: "#EADBDD",
         },
         ink: {
-          DEFAULT: "#16221C",
-          soft: "#4B5A50",
-          faint: "#8B9389",
+          DEFAULT: "#1A0A0F",
+          soft: "#4F3B42",
+          faint: "#8A787E",
         },
         ledger: {
-          50: "#E7F2EC",
-          100: "#C7E2D2",
-          400: "#2F8F5E",
-          500: "#1F6E4A",
-          600: "#175939",
-          900: "#123B28",
+          50: "#FFF1F2",
+          100: "#FFE4E6",
+          200: "#FECDD3",
+          300: "#FDA4AF",
+          400: "#E11D48",
+          500: "#9F1239",
+          600: "#881337",
+          700: "#6B0E2A",
+          900: "#4C0519",
+        },
+        maroon: {
+          50: "#FFF1F2",
+          100: "#FFE4E6",
+          200: "#FECDD3",
+          300: "#FDA4AF",
+          400: "#E11D48",
+          500: "#9F1239",
+          600: "#881337",
+          700: "#6B0E2A",
+          900: "#4C0519",
         },
         rust: {
           50: "#F7E9E1",

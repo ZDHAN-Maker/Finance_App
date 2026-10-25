@@ -9,6 +9,7 @@ import {
   setCustomGeminiApiKey,
   hasGeminiApiKey,
 } from "../services/geminiService";
+import { sendDeviceNotification } from "../utils/notificationService";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -265,6 +266,23 @@ export function SettingsPage() {
               : notificationPermission === "denied"
                 ? "Notifikasi diblokir"
                 : "Izinkan notifikasi"}
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              if (notificationPermission !== "granted") {
+                const res = await Notification.requestPermission();
+                setNotificationPermission(res);
+                if (res !== "granted") return;
+              }
+              await sendDeviceNotification("💰 D'Cash - Batasan Hari Ini", {
+                body: "Notifikasi HP aktif! Kamu akan menerima pengingat batas belanja & jatah jajan harian.",
+              });
+            }}
+            className="w-full rounded-lg border border-paper-line bg-paper px-3 py-2 text-xs font-semibold text-ink hover:bg-paper-line"
+          >
+            🔔 Tes Notifikasi Batasan ke HP
           </button>
 
           {installReady && installPromptEvent && (

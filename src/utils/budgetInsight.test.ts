@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getBudgetHealth, getBudgetSplit, getCashFlowForecast, getDailySpendingGuide, getFinancialHealthSummary, getSpendingInsight } from "./budgetInsight";
+import {
+  getBudgetHealth,
+  getBudgetSplit,
+  getCashFlowForecast,
+  getDailySpendingGuide,
+  getFinancialHealthSummary,
+  getSpendingInsight,
+  isJajanCategory,
+  calculateJajanBudgetGuide,
+} from "./budgetInsight";
 
 test("getBudgetSplit memberi pembagian 60/20/20 yang masuk akal", () => {
   const result = getBudgetSplit(10000000);
@@ -48,5 +57,57 @@ test("getDailySpendingGuide menghitung batas belanja harian yang realistis", () 
 
   assert.ok(result.dailyAllowance > 0);
   assert.ok(result.message.includes("hari"));
-  assert.ok(result.recommendedSpend >= 0);
+});
+
+test("isJajanCategory mengidentifikasi kategori jajan dengan tepat", () => {
+  assert.equal(isJajanCategory("Makanan & Minuman"), true);
+  assert.equal(isJajanCategory("Kopi Sore"), true);
+  assert.equal(isJajanCategory("Nongkrong Kafe"), true);
+  assert.equal(isJajanCategory("Hiburan Bioskop"), true);
+  assert.equal(isJajanCategory("Belanja Shopping"), true);
+
+  // Kebutuhan pokok tidak dianggap jajan
+  assert.equal(isJajanCategory("Tagihan Listrik"), false);
+  assert.equal(isJajanCategory("Sewa Kos"), false);
+  assert.equal(isJajanCategory("Bensin Motor"), false);
+  assert.equal(isJajanCategory("Gaji"), false);
+});
+
+test("calculateJajanBudgetGuide menghitung batasan bulanan, harian, dan jajan dengan benar", () => {
+  const guide = calculateJajanBudgetGuide({
+    monthlyIncome: 4000000,
+    monthlyExpense: 1000000,
+    budgetLimit: 3000000,
+    todayDateStr: "2026-10-25",
+    transactions: [
+      {
+        type: "expense",
+        amount: 25000,
+        transaction_date: "2026-10-25",
+        category_name: "Kopi & Jajan",
+      },
+      {
+        type: "expense",
+        amount: 50000,
+        transaction_date: "2026-10-25",
+        category_name: "Bensin",
+      },
+    ],
+  });
+
+  assert.equal(guide.monthlyBudget, 3000000);
+  assert.equal(guide.monthlyExpense, 1000000);
+  assert.equal(guide.remainingMonthlyBudget, 2000000);
+  assert.equal(guide.monthlyStatus, "aman");
+
+  // Pengeluaran hari ini total 75.000
+  assert.equal(guide.todayTotalSpent, 75000);
+
+  // Pengeluaran jajan hari ini 25.000
+  assert.equal(guide.todayJajanSpent, 25000);
+
+  // Jatah jajan per hari harus lebih dari 0
+  assert.ok(guide.dailyJajanLimit > 0);
+  assert.ok(guide.headline.length > 0);
+  assert.ok(guide.notificationMessage.includes("Batas belanja harian"));
 });

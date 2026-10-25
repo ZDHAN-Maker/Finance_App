@@ -2,7 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { CategoryBreakdownItem } from "../types";
 import { formatRupiah } from "../utils/formatCurrency";
 
-const PALETTE = ["#1F6E4A", "#2F8F5E", "#C99A2E", "#B3441F", "#8F3417", "#4B5A50", "#175939"];
+const PALETTE = ["#881337", "#9F1239", "#BE123C", "#E11D48", "#C99A2E", "#B3441F", "#4C0519"];
 
 export function CategoryDonutChart({ breakdown }: { breakdown: CategoryBreakdownItem[] }) {
   if (breakdown.length === 0) {

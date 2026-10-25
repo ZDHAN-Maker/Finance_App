@@ -212,3 +212,183 @@ export function getFinancialHealthSummary(
     nextAction,
   };
 }
+
+
+export interface JajanBudgetGuide {
+  // Metrik Bulanan
+  monthlyBudget: number;
+  monthlyExpense: number;
+  remainingMonthlyBudget: number;
+  monthlyStatus: "aman" | "hati-hati" | "over-budget";
+
+  // Metrik Harian Total
+  daysLeft: number;
+  dailyTotalLimit: number;
+  todayTotalSpent: number;
+  todayTotalRemaining: number;
+  dailyStatus: "aman" | "hati-hati" | "over-budget";
+
+  // Metrik Jajan / Keinginan (Wants)
+  monthlyJajanBudget: number;
+  monthlyJajanSpent: number;
+  remainingJajanBudget: number;
+  dailyJajanLimit: number;
+  todayJajanSpent: number;
+  todayJajanRemaining: number;
+  jajanStatus: "aman" | "waspada" | "over-budget";
+
+  // Pesan ringkasan terintegrasi (dipakai untuk UI & Push Notifikasi HP)
+  headline: string;
+  notificationMessage: string;
+}
+
+export function isJajanCategory(categoryName?: string | null): boolean {
+  if (!categoryName) return false;
+  const name = categoryName.toLowerCase().trim();
+  const jajanKeywords = [
+    "makan", "jajan", "kopi", "kafe", "cafe", "snack", "camilan",
+    "hiburan", "nonton", "bioskop", "belanja", "shopping", "nongkrong",
+    "kuliner", "game", "gaming", "hobi", "lifestyle", "jalan"
+  ];
+  const essentialKeywords = [
+    "tagihan", "listrik", "air", "pdam", "wifi", "internet", "sewa",
+    "kos", "kontrakan", "cicilan", "pendidikan", "kesehatan", "obat",
+    "asuransi", "pajak", "bensin", "transportasi kerja", "gaji"
+  ];
+
+  if (essentialKeywords.some((k) => name.includes(k))) return false;
+  return jajanKeywords.some((k) => name.includes(k));
+}
+
+export function calculateJajanBudgetGuide(params: {
+  monthlyIncome: number;
+  monthlyExpense: number;
+  budgetLimit: number;
+  customJajanBudget?: number;
+  transactions?: Array<{
+    type: "income" | "expense";
+    amount: number;
+    transaction_date: string;
+    category_name?: string | null;
+  }>;
+  todayDateStr?: string;
+}): JajanBudgetGuide {
+  const {
+    monthlyIncome,
+    monthlyExpense,
+    budgetLimit,
+    customJajanBudget,
+    transactions = [],
+    todayDateStr = new Date().toISOString().slice(0, 10),
+  } = params;
+
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth(); // 0-based
+  const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+  const currentDay = today.getDate();
+  const daysLeft = Math.max(totalDaysInMonth - currentDay + 1, 1);
+
+  // 1. Batas Bulanan
+  const effectiveMonthlyBudget =
+    budgetLimit > 0
+      ? budgetLimit
+      : monthlyIncome > 0
+        ? Math.round(monthlyIncome * 0.8)
+        : Math.max(monthlyExpense, 1500000);
+
+  const remainingMonthlyBudget = Math.max(effectiveMonthlyBudget - monthlyExpense, 0);
+  const monthlyStatus: JajanBudgetGuide["monthlyStatus"] =
+    monthlyExpense > effectiveMonthlyBudget
+      ? "over-budget"
+      : monthlyExpense >= effectiveMonthlyBudget * 0.85
+        ? "hati-hati"
+        : "aman";
+
+  // 2. Batas Belanja Harian Total
+  const dailyTotalLimit = Math.max(Math.round(remainingMonthlyBudget / daysLeft), 0);
+
+  // Hitung pengeluaran hari ini
+  const todayExpenses = transactions.filter(
+    (t) => t.type === "expense" && t.transaction_date === todayDateStr
+  );
+  const todayTotalSpent = todayExpenses.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const todayTotalRemaining = Math.max(dailyTotalLimit - todayTotalSpent, 0);
+
+  const dailyStatus: JajanBudgetGuide["dailyStatus"] =
+    todayTotalSpent > dailyTotalLimit && dailyTotalLimit > 0
+      ? "over-budget"
+      : todayTotalRemaining <= dailyTotalLimit * 0.2
+        ? "hati-hati"
+        : "aman";
+
+  // 3. Batas Jajan / Keinginan (Wants)
+  // Default 25% dari total budget bulanan (atau 20% pemasukan sesuai aturan 60/20/20)
+  const defaultJajanBudget =
+    customJajanBudget && customJajanBudget > 0
+      ? customJajanBudget
+      : Math.round(effectiveMonthlyBudget * 0.25);
+
+  const monthlyJajanBudget = Math.max(defaultJajanBudget, 200000);
+
+  // Pengeluaran jajan bulan ini
+  const monthlyJajanSpent = transactions
+    .filter((t) => t.type === "expense" && isJajanCategory(t.category_name))
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const remainingJajanBudget = Math.max(monthlyJajanBudget - monthlyJajanSpent, 0);
+  const dailyJajanLimit = Math.max(Math.round(remainingJajanBudget / daysLeft), 0);
+
+  // Jajan yang sudah terpakai hari ini
+  const todayJajanSpent = todayExpenses
+    .filter((t) => isJajanCategory(t.category_name))
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const todayJajanRemaining = dailyJajanLimit - todayJajanSpent;
+
+  const jajanStatus: JajanBudgetGuide["jajanStatus"] =
+    todayJajanRemaining < 0
+      ? "over-budget"
+      : todayJajanRemaining <= dailyJajanLimit * 0.25
+        ? "waspada"
+        : "aman";
+
+  const fmtRp = (n: number) =>
+    new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(n);
+
+  let headline = "";
+  if (jajanStatus === "over-budget") {
+    headline = `⚠️ Jajan hari ini over-budget sebesar ${fmtRp(Math.abs(todayJajanRemaining))}.`;
+  } else if (jajanStatus === "waspada") {
+    headline = `⚡ Jatah jajan hari ini hampir habis, sisa ${fmtRp(Math.max(todayJajanRemaining, 0))}.`;
+  } else {
+    headline = `✨ Anggaran jajan hari ini aman: ${fmtRp(Math.max(todayJajanRemaining, 0))} tersisa.`;
+  }
+
+  const notificationMessage = `Batas belanja harian: ${fmtRp(dailyTotalLimit)} (Sisa: ${fmtRp(todayTotalRemaining)}). Jatah jajan per hari: ${fmtRp(dailyJajanLimit)} (Sisa jajan hari ini: ${fmtRp(Math.max(todayJajanRemaining, 0))}).`;
+
+  return {
+    monthlyBudget: effectiveMonthlyBudget,
+    monthlyExpense,
+    remainingMonthlyBudget,
+    monthlyStatus,
+    daysLeft,
+    dailyTotalLimit,
+    todayTotalSpent,
+    todayTotalRemaining,
+    dailyStatus,
+    monthlyJajanBudget,
+    monthlyJajanSpent,
+    remainingJajanBudget,
+    dailyJajanLimit,
+    todayJajanSpent,
+    todayJajanRemaining,
+    jajanStatus,
+    headline,
+    notificationMessage,
+  };
+}

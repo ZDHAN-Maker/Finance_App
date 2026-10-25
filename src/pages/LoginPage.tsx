@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { isSupabaseConfigured } from "../services/supabaseClient";
+import { BrandLogo } from "../components/BrandLogo";
 
 export function LoginPage() {
   const { session, loading, signIn, signUp } = useAuth();
@@ -38,11 +39,11 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-ledger-500 font-display text-lg font-semibold text-white">
-            D
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-3">
+            <BrandLogo size="lg" showText={false} />
           </div>
-          <h1 className="font-display text-2xl font-semibold text-ink">D'Cash</h1>
+          <h1 className="font-display text-2xl font-bold text-ink">D&apos;Cash</h1>
           <p className="mt-1 text-sm text-ink-faint">Catat lewat Telegram, pantau lewat sini.</p>
         </div>
 

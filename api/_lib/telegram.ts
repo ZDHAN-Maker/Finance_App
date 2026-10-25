@@ -1,8 +1,8 @@
 export const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: "+ Pemasukan" }, { text: "- Pengeluaran" }],
-    [{ text: "Cek Saldo" }, { text: "Bulan Ini" }],
-    [{ text: "Riwayat" }, { text: "Statistik" }],
+    [{ text: "Batas & Jajan Hari Ini" }, { text: "Cek Saldo" }],
+    [{ text: "Bulan Ini" }, { text: "Riwayat" }],
   ],
   resize_keyboard: true,
 };

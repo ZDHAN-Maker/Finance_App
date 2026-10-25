@@ -67,3 +67,50 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+
+// ---------------------------------------------------------------------------
+// Push & Notification Handling
+// ---------------------------------------------------------------------------
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  try {
+    const data = event.data.json();
+    const title = data.title || "D'Cash - Notifikasi Batasan Keuangan";
+    const options = {
+      body: data.body || "Cek batas pengeluaran dan jatah jajan kamu hari ini.",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: data.url || "/dashboard" },
+      vibrate: [100, 50, 100],
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch {
+    const text = event.data.text();
+    event.waitUntil(
+      self.registration.showNotification("D'Cash", {
+        body: text,
+        icon: "/icons/icon-192.png",
+      })
+    );
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const urlToOpen = event.notification.data?.url || "/dashboard";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(urlToOpen) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});

@@ -3,6 +3,7 @@ import { Modal } from "./Modal";
 import type { Category, Transaction, TransactionType } from "../types";
 import { todayDateInputValue } from "../utils/formatDate";
 import type { TransactionInput } from "../hooks/useTransactions";
+import { isJajanCategory } from "../utils/budgetInsight";
 
 interface Props {
   categories: Category[];
@@ -102,6 +103,12 @@ export function TransactionFormModal({ categories, initial, onSubmit, onClose }:
               </option>
             ))}
           </select>
+          {type === "expense" && categoryId && isJajanCategory(filteredCategories.find((c) => c.id === categoryId)?.name) && (
+            <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-ledger-600">
+              <span>☕</span>
+              <span>Kategori ini masuk ke alokasi kuota jajan / gaya hidup harian kamu.</span>
+            </p>
+          )}
         </div>
 
         <div>

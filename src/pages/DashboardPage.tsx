@@ -15,11 +15,13 @@ import { useSavingsGoals } from "../hooks/useSavingsGoals";
 import { currentMonthKey } from "../utils/formatDate";
 import { formatRupiah } from "../utils/formatCurrency";
 import { calculateGoalProgress, summarizeGoalHistory, summarizeGoalPriority, summarizeSavingsPortfolio, summarizeSavingsTrend } from "../utils/savingsGoals";
-import { getBudgetHealth, getCashFlowForecast, getBudgetSplit, getDailySpendingGuide, getFinancialHealthSummary, getSpendingInsight } from "../utils/budgetInsight";
+import { getBudgetHealth, getCashFlowForecast, getBudgetSplit, getDailySpendingGuide, getFinancialHealthSummary, getSpendingInsight, calculateJajanBudgetGuide } from "../utils/budgetInsight";
 import { getNextRecurringDepositDate } from "../utils/savingsGoals";
 import { IconPlus, IconTrash, IconSparkle } from "../components/Icons";
 import { getAiPlanHistory, updateAiPlanStatus, type AiBudgetPlan } from "../utils/aiPlanManager";
 import { useNavigate } from "react-router-dom";
+import { DailyJajanCard } from "../components/DailyJajanCard";
+import { checkAndSendDailyBriefing } from "../utils/notificationService";
 
 function formatDate(idDate: string) {
   return new Date(`${idDate}T00:00:00`).toLocaleDateString("id-ID", {
@@ -51,11 +53,13 @@ export function DashboardPage() {
   const [goalTab, setGoalTab] = useState<"all" | "active" | "completed">("all");
   const navigate = useNavigate();
 
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [budgetLimit, setBudgetLimit] = useState<number>(() => {
     if (typeof window === "undefined") return 0;
     const saved = Number(localStorage.getItem("kas-budget-limit") ?? "0");
     return Number.isFinite(saved) ? saved : 0;
   });
+  const [budgetInput, setBudgetInput] = useState(() => (budgetLimit > 0 ? String(budgetLimit) : ""));
 
   // Sinkronisasi otomatis saat AI menerapkan rancangan anggaran baru
   useEffect(() => {
@@ -153,6 +157,31 @@ export function DashboardPage() {
     () => getDailySpendingGuide(monthly?.total_income ?? 0, monthly?.total_expense ?? 0, budgetLimit || baseBudget.budgetLimitDefault, 30),
     [monthly?.total_income, monthly?.total_expense, budgetLimit, baseBudget.budgetLimitDefault]
   );
+  const jajanGuide = useMemo(() => {
+    return calculateJajanBudgetGuide({
+      monthlyIncome: monthly?.total_income ?? 0,
+      monthlyExpense: monthly?.total_expense ?? 0,
+      budgetLimit: budgetLimit || baseBudget.budgetLimitDefault,
+      transactions: recent.map((t) => {
+        const catRow = t.categories;
+        const name = Array.isArray(catRow)
+          ? catRow[0]?.name
+          : catRow?.name ?? categories.find((c) => c.id === t.category_id)?.name;
+        return {
+          type: t.type,
+          amount: Number(t.amount),
+          transaction_date: t.transaction_date,
+          category_name: name,
+        };
+      }),
+    });
+  }, [monthly?.total_income, monthly?.total_expense, budgetLimit, baseBudget.budgetLimitDefault, recent, categories]);
+
+  useEffect(() => {
+    if (jajanGuide && !summaryLoading) {
+      void checkAndSendDailyBriefing(jajanGuide);
+    }
+  }, [jajanGuide, summaryLoading]);
   const nextRecurringGoal = useMemo(
     () => goals.filter((goal) => Number(goal.recurringAmount ?? 0) > 0 && Number(goal.recurringDay ?? 0) > 0).sort((a, b) => {
       const aDate = getNextRecurringDepositDate(a).getTime();
@@ -309,20 +338,32 @@ export function DashboardPage() {
         <p className="mt-2 text-sm font-medium text-ink">Aksi: {financialHealth.nextAction}</p>
       </section>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <div className="rounded-card border border-paper-line bg-paper-card p-4">
-          <p className="text-[11px] uppercase tracking-wide text-ink-faint">Panduan belanja hari ini</p>
-          <p className="mt-2 text-xl font-semibold text-ink">{formatRupiah(dailyGuide.dailyAllowance)}</p>
-          <p className="mt-1 text-sm text-ink-faint">{dailyGuide.message}</p>
-        </div>
+      {/* Panduan Batasan Keuangan & Jatah Jajan Hari Ini */}
+      <div className="mt-4">
+        <DailyJajanCard
+          guide={jajanGuide}
+          onUpdateBudgetLimit={() => {
+            setBudgetInput(budgetLimit > 0 ? String(budgetLimit) : "");
+            setShowBudgetModal(true);
+          }}
+        />
+      </div>
+
+      <div className="mt-4">
         <div className="rounded-card border border-paper-line bg-paper-card p-4">
           <p className="text-[11px] uppercase tracking-wide text-ink-faint">Setoran otomatis berikutnya</p>
           {nextRecurringGoal && nextRecurringDate ? (
-            <>
-              <p className="mt-2 text-xl font-semibold text-ink">{nextRecurringGoal.name}</p>
-              <p className="mt-1 text-sm text-ink-faint">{nextRecurringDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
-              <p className="mt-2 text-sm font-medium text-ledger-700">{formatRupiah(Number(nextRecurringGoal.recurringAmount ?? 0))}</p>
-            </>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-base font-semibold text-ink">{nextRecurringGoal.name}</p>
+                <p className="text-xs text-ink-faint">
+                  Jatuh tempo: {nextRecurringDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                </p>
+              </div>
+              <p className="font-mono text-base font-bold text-ledger-600">
+                {formatRupiah(Number(nextRecurringGoal.recurringAmount ?? 0))}
+              </p>
+            </div>
           ) : (
             <p className="mt-2 text-sm text-ink-faint">Belum ada target dengan setoran otomatis aktif.</p>
           )}
@@ -965,6 +1006,60 @@ export function DashboardPage() {
               >
                 <IconSparkle width={14} height={14} />
                 <span>+ Buat Rancangan Target Baru (AI Planner)</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Atur Batas Anggaran Bulanan */}
+      {showBudgetModal && (
+        <Modal title="Atur Batas Anggaran Bulanan" onClose={() => setShowBudgetModal(false)}>
+          <div className="space-y-4">
+            <p className="text-xs leading-relaxed text-ink-faint">
+              Batas anggaran bulanan digunakan untuk mengkalkulasi batas belanja harian dan jatah uang jajan kamu secara otomatis setiap harinya.
+            </p>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink-soft">
+                Batas Pengeluaran Bulanan (Rp)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={50000}
+                value={budgetInput}
+                onChange={(e) => setBudgetInput(e.target.value)}
+                placeholder="Contoh: 3000000"
+                className="w-full rounded-lg border border-paper-line bg-white px-3 py-2 font-mono text-sm text-ink focus:border-ledger-500 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-ink-faint">
+                Rekomendasi sistem: {formatRupiah(Math.max(baseBudget.budgetLimitDefault, 1500000))}
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-paper-line">
+              <button
+                type="button"
+                onClick={() => setShowBudgetModal(false)}
+                className="rounded-lg border border-paper-line bg-paper px-3 py-1.5 text-xs font-medium text-ink hover:bg-paper-line"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const val = Number(budgetInput);
+                  if (Number.isFinite(val) && val >= 0) {
+                    setBudgetLimit(val);
+                    localStorage.setItem("kas-budget-limit", String(val));
+                    window.dispatchEvent(new CustomEvent("kas-data-updated"));
+                    setShowBudgetModal(false);
+                  }
+                }}
+                className="rounded-lg bg-ledger-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-ledger-600"
+              >
+                Simpan Batas
               </button>
             </div>
           </div>

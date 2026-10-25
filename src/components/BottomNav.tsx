@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { IconHome, IconList, IconTag, IconSettings, IconSparkle } from "./Icons";
+import { BrandLogo } from "./BrandLogo";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: IconHome },
@@ -35,11 +36,8 @@ export function BottomNav() {
 export function SideNav() {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-paper-line bg-paper-card px-4 py-6 md:flex">
-      <div className="mb-8 flex items-center gap-2 px-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-ledger-500 font-display text-sm font-semibold text-white">
-          D
-        </div>
-        <span className="font-display text-lg font-semibold text-ink">D'Cash</span>
+      <div className="mb-8 px-2">
+        <BrandLogo size="md" />
       </div>
       <div className="flex flex-1 flex-col gap-1">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => (

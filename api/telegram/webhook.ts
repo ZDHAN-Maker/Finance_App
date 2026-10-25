@@ -6,6 +6,7 @@ import { formatRupiah, currentMonthKey, monthKeyToRange } from "../_lib/format.j
 
 const HELP_TEXT = `<b>Perintah yang tersedia</b>
 
+/batas atau /jajan - cek batas harian, bulanan & jatah jajan
 /saldo - lihat saldo saat ini
 /bulan - ringkasan bulan ini
 /riwayat - 5 transaksi terakhir
@@ -14,6 +15,7 @@ const HELP_TEXT = `<b>Perintah yang tersedia</b>
 
 Atau langsung kirim transaksi, contoh:
 <code>30k bensin</code>
+<code>25rb kopi</code>
 <code>gaji 5jt</code>`;
 
 type AppUserRow = { id: string; name: string | null; telegram_id: number | null };
@@ -176,6 +178,88 @@ async function handleRiwayat(chatId: number, userId: string) {
   await sendTelegramMessage(chatId, `🧾 <b>5 transaksi terakhir</b>\n\n<pre>${lines.join("\n")}</pre>`);
 }
 
+async function handleBatasDanJajan(chatId: number, userId: string) {
+  const admin = getSupabaseAdmin();
+  const monthKey = currentMonthKey();
+  const { start, end } = monthKeyToRange(monthKey);
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const { data } = await admin
+    .from("transactions")
+    .select("type, amount, transaction_date, categories(name)")
+    .eq("user_id", userId)
+    .gte("transaction_date", start)
+    .lte("transaction_date", end);
+
+  let income = 0;
+  let expense = 0;
+  let todayExpense = 0;
+  let todayJajan = 0;
+  let monthlyJajan = 0;
+
+  const jajanKeywords = ["makan", "jajan", "kopi", "kafe", "cafe", "snack", "hiburan", "nonton", "belanja", "kuliner", "nongkrong"];
+  const isJajan = (catName?: string) => {
+    if (!catName) return false;
+    const l = catName.toLowerCase();
+    return jajanKeywords.some((k) => l.includes(k));
+  };
+
+  for (const row of data ?? []) {
+    const amt = Number(row.amount);
+    const catName = Array.isArray(row.categories)
+      ? row.categories[0]?.name
+      : (row.categories as { name?: string } | null)?.name;
+    if (row.type === "income") {
+      income += amt;
+    } else {
+      expense += amt;
+      const j = isJajan(catName);
+      if (j) monthlyJajan += amt;
+      if (row.transaction_date === todayStr) {
+        todayExpense += amt;
+        if (j) todayJajan += amt;
+      }
+    }
+  }
+
+  const today = new Date();
+  const totalDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const daysLeft = Math.max(totalDays - today.getDate() + 1, 1);
+
+  // Perhitungan target budget (prioritas 80% pemasukan atau fallback wajar)
+  const monthlyBudget = income > 0 ? Math.round(income * 0.8) : Math.max(expense, 2000000);
+  const remainingBudget = Math.max(monthlyBudget - expense, 0);
+  const dailyTotalLimit = Math.max(Math.round(remainingBudget / daysLeft), 0);
+  const todayTotalRemaining = Math.max(dailyTotalLimit - todayExpense, 0);
+
+  // Alokasi pos jajan (25% dari total budget)
+  const monthlyJajanBudget = Math.round(monthlyBudget * 0.25);
+  const remainingJajan = Math.max(monthlyJajanBudget - monthlyJajan, 0);
+  const dailyJajanLimit = Math.max(Math.round(remainingJajan / daysLeft), 0);
+  const todayJajanRemaining = dailyJajanLimit - todayJajan;
+
+  const text = `📊 <b>Batasan Keuangan & Jajan Hari Ini</b>\n` +
+    `<i>D'Cash Personal Assistant</i>\n\n` +
+    `📅 <b>Sisa hari bulan ini:</b> ${daysLeft} hari lagi\n\n` +
+    `💳 <b>Batas Bulanan:</b>\n` +
+    `• Anggaran : ${formatRupiah(monthlyBudget)}\n` +
+    `• Terpakai : ${formatRupiah(expense)}\n` +
+    `• Sisa Kas : <b>${formatRupiah(remainingBudget)}</b>\n\n` +
+    `🛒 <b>Batas Belanja Hari Ini:</b>\n` +
+    `• Alokasi aman : ${formatRupiah(dailyTotalLimit)} / hari\n` +
+    `• Terpakai hari ini : ${formatRupiah(todayExpense)}\n` +
+    `• Sisa belanja hari ini : <b>${formatRupiah(todayTotalRemaining)}</b>\n\n` +
+    `☕ <b>Jatah Uang Jajan Hari Ini:</b>\n` +
+    `• Kuota jajan : ${formatRupiah(dailyJajanLimit)} / hari\n` +
+    `• Jajan hari ini : ${formatRupiah(todayJajan)}\n` +
+    `• Sisa jatah jajan : <b>${todayJajanRemaining >= 0 ? formatRupiah(todayJajanRemaining) : `⚠️ Melebihi ${formatRupiah(Math.abs(todayJajanRemaining))}`}</b>\n\n` +
+    (todayJajanRemaining < 0
+      ? `⚠️ <i>Catatan: Kuota jajan hari ini sudah terlampaui. Tahan jajan dulu sampai besok ya!</i>`
+      : `✨ <i>Kondisi jajan hari ini masih dalam batas aman.</i>`);
+
+  await sendTelegramMessage(chatId, text, { replyMarkup: MAIN_KEYBOARD });
+}
+
 async function handleNewTransaction(chatId: number, userId: string, text: string) {
   const parsed = parseTransactionMessage(text);
 
@@ -214,9 +298,17 @@ async function handleNewTransaction(chatId: number, userId: string, text: string
   }
 
   const jenisLabel = parsed.type === "income" ? "Pemasukan" : "Pengeluaran";
+  const isJajan = ["makan", "jajan", "kopi", "kafe", "snack", "hiburan", "nonton", "belanja"].some((k) =>
+    parsed.categoryName.toLowerCase().includes(k)
+  );
+  const advice = parsed.type === "expense" && isJajan
+    ? "\n\n💡 <i>Ketik /jajan atau klik tombol <b>Batas & Jajan Hari Ini</b> untuk cek sisa kuota jajan kamu.</i>"
+    : "";
+
   await sendTelegramMessage(
     chatId,
-    `✅ <b>Transaksi dicatat</b>\n\n<pre>Jenis      : ${jenisLabel}\nNominal    : ${formatRupiah(parsed.amount)}\nKategori   : ${parsed.categoryName}\nKeterangan : ${parsed.description}</pre>`
+    `✅ <b>Transaksi dicatat</b>\n\n<pre>Jenis      : ${jenisLabel}\nNominal    : ${formatRupiah(parsed.amount)}\nKategori   : ${parsed.categoryName}\nKeterangan : ${parsed.description}</pre>${advice}`,
+    { replyMarkup: MAIN_KEYBOARD }
   );
 }
 
@@ -288,6 +380,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (command === "/saldo" || text === "Cek Saldo") {
       await handleSaldo(chatId, appUser.id);
+    } else if (
+      command === "/jajan" ||
+      command === "/budget" ||
+      command === "/batas" ||
+      text === "Batas & Jajan Hari Ini"
+    ) {
+      await handleBatasDanJajan(chatId, appUser.id);
     } else if (command === "/bulan" || text === "Bulan Ini" || text === "Statistik") {
       await handleBulanIni(chatId, appUser.id);
     } else if (command === "/riwayat" || text === "Riwayat") {
