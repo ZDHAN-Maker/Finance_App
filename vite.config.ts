@@ -13,11 +13,31 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Saat "npm run dev", request ke /api diteruskan ke "vercel dev"
-      // (default port 3000) supaya serverless functions bisa dites lokal.
+      // Saat "npm run dev", request ke /api diteruskan ke live Vercel API
+      // atau ke process.env.VITE_API_URL jika ingin menggunakan serverless lokal (port 3000).
       "/api": {
-        target: "http://localhost:3000",
+        target:
+          process.env.VITE_API_URL ||
+          "https://finance-bv1flxygd-dhandans-projects.vercel.app",
         changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on("error", (_err, _req, res) => {
+            if (res && "writeHead" in res) {
+              const resp = res as { headersSent?: boolean; writeHead: (code: number, headers: Record<string, string>) => void; end: (body: string) => void };
+              if (!resp.headersSent) {
+                resp.writeHead(502, { "Content-Type": "application/json" });
+                resp.end(
+                  JSON.stringify({
+                    error: "BadGateway",
+                    message:
+                      "Tidak dapat terhubung ke server API. Periksa koneksi atau jalankan 'npx vercel dev'.",
+                  })
+                );
+              }
+            }
+          });
+        },
       },
     },
   },

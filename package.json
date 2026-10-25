@@ -5,7 +5,7 @@
   "description": "Aplikasi pencatatan keuangan pribadi - Telegram Bot + React PWA (Supabase + Vercel)",
   "type": "module",
   "engines": {
-    "node": ">=18.17.0"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "vite",

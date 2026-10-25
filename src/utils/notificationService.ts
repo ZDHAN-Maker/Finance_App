@@ -112,3 +112,4 @@ export async function sendTelegramBudgetAlert(guide: JajanBudgetGuide): Promise<
     return { success: false, message: errorMsg };
   }
 }
+

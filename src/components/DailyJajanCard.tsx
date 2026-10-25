@@ -228,3 +228,4 @@ export function DailyJajanCard({ guide, onUpdateBudgetLimit }: Props) {
     </div>
   );
 }
+
