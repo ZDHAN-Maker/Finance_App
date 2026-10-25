@@ -91,7 +91,7 @@ export async function checkAndSendDailyBriefing(guide: JajanBudgetGuide): Promis
  */
 export async function sendTelegramBudgetAlert(guide: JajanBudgetGuide): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await api.post<{ success: boolean; message: string }>("/telegram/send-summary", {
+    const res = await api.put<{ success: boolean; message: string }>("/auth/telegram-link", {
       monthlyBudget: guide.monthlyBudget,
       monthlyExpense: guide.monthlyExpense,
       remainingMonthlyBudget: guide.remainingMonthlyBudget,
