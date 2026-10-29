@@ -26,7 +26,15 @@ export function getNotificationPermission(): NotificationPermission | "unsupport
  * Mengirim notifikasi lokal ke HP (via Service Worker PWA atau Notification API).
  */
 export async function sendDeviceNotification(title: string, options: NotificationOptions = {}): Promise<boolean> {
-  if (!isNotificationSupported() || Notification.permission !== "granted") {
+  if (!isNotificationSupported()) {
+    return false;
+  }
+
+  // Jika izin belum diberikan, coba minta izin terlebih dahulu
+  if (Notification.permission === "default") {
+    const perm = await requestNotificationPermission();
+    if (perm !== "granted") return false;
+  } else if (Notification.permission !== "granted") {
     return false;
   }
 
@@ -39,15 +47,25 @@ export async function sendDeviceNotification(title: string, options: Notificatio
   try {
     // Utamakan Service Worker registration (didukung di PWA Android/Mobile)
     if ("serviceWorker" in navigator) {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && "showNotification" in reg) {
-        await reg.showNotification(title, defaultOptions);
-        return true;
+      try {
+        const reg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+        ]);
+        if (reg && "showNotification" in reg) {
+          await reg.showNotification(title, defaultOptions);
+          return true;
+        }
+      } catch (swErr) {
+        console.warn("SW showNotification gagal, beralih ke window.Notification:", swErr);
       }
     }
     // Fallback standard window.Notification
-    new Notification(title, defaultOptions);
-    return true;
+    if (typeof Notification !== "undefined") {
+      new Notification(title, defaultOptions);
+      return true;
+    }
+    return false;
   } catch (err) {
     console.warn("Gagal menampilkan notifikasi perangkat:", err);
     return false;
@@ -58,10 +76,23 @@ export async function sendDeviceNotification(title: string, options: Notificatio
  * Mengirim notifikasi batasan keuangan & jajan ke HP.
  */
 export async function sendBudgetLimitNotification(guide: JajanBudgetGuide): Promise<boolean> {
-  const title = `💰 Batasan Keuangan & Jajan Hari Ini`;
+  const statusLabel =
+    guide.jajanStatus === "over-budget"
+      ? "⚠️ Over Budget!"
+      : guide.jajanStatus === "waspada"
+      ? "⚡ Waspada Jajan"
+      : "✓ Anggaran Aman";
+
+  const title = `💰 Batasan Keuangan & Jajan (${statusLabel})`;
+  const sisaJajanStr =
+    guide.todayJajanRemaining >= 0
+      ? formatRupiah(guide.todayJajanRemaining)
+      : `-${formatRupiah(Math.abs(guide.todayJajanRemaining))}`;
+
   const body =
     `Batas belanja hari ini: ${formatRupiah(guide.dailyTotalLimit)} (Sisa: ${formatRupiah(guide.todayTotalRemaining)}).\n` +
-    `Jatah jajan: ${formatRupiah(guide.dailyJajanLimit)}/hari (Sisa jajan hari ini: ${formatRupiah(Math.max(guide.todayJajanRemaining, 0))}).`;
+    `Jatah jajan: ${formatRupiah(guide.dailyJajanLimit)}/hari (Sisa jajan hari ini: ${sisaJajanStr}).\n` +
+    `Sisa hari: ${guide.daysLeft} hari lagi bulan ini.`;
 
   return sendDeviceNotification(title, {
     body,
@@ -87,9 +118,24 @@ export async function checkAndSendDailyBriefing(guide: JajanBudgetGuide): Promis
 }
 
 /**
- * Mengirim ringkasan lengkap ke Telegram bot HP user.
+ * Mengirim ringkasan lengkap ke Telegram bot HP user,
+ * SEKALIGUS memicu notifikasi pop-up di layar HP.
  */
-export async function sendTelegramBudgetAlert(guide: JajanBudgetGuide): Promise<{ success: boolean; message: string }> {
+export async function sendTelegramBudgetAlert(
+  guide: JajanBudgetGuide,
+  options: { triggerDeviceNotif?: boolean } = { triggerDeviceNotif: true }
+): Promise<{ success: boolean; deviceNotifSent: boolean; message: string }> {
+  // 1. Munculkan notifikasi ke layar HP secara bersamaan jika diaktifkan
+  let deviceNotifSent = false;
+  if (options.triggerDeviceNotif !== false && isNotificationSupported()) {
+    try {
+      deviceNotifSent = await sendBudgetLimitNotification(guide);
+    } catch (e) {
+      console.warn("Gagal menampilkan notifikasi perangkat saat trigger Telegram:", e);
+    }
+  }
+
+  // 2. Kirim pesan ke bot Telegram
   try {
     const res = await api.put<{ success: boolean; message: string }>("/auth/telegram-link", {
       monthlyBudget: guide.monthlyBudget,
@@ -105,11 +151,12 @@ export async function sendTelegramBudgetAlert(guide: JajanBudgetGuide): Promise<
     });
     return {
       success: res?.success ?? true,
+      deviceNotifSent,
       message: res?.message ?? "Ringkasan berhasil dikirim ke Telegram kamu!",
     };
   } catch (err) {
     const errorMsg = (err as Error).message || "Gagal mengirim ke Telegram.";
-    return { success: false, message: errorMsg };
+    return { success: false, deviceNotifSent, message: errorMsg };
   }
 }
 
