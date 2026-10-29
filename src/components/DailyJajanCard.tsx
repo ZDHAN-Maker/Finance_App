@@ -50,15 +50,23 @@ export function DailyJajanCard({ guide, onUpdateBudgetLimit }: Props) {
     try {
       const res = await sendTelegramBudgetAlert(guide);
       if (res.success) {
-        setNotifFeedback("✓ Berhasil dikirim ke Telegram kamu!");
+        if (res.deviceNotifSent) {
+          setNotifFeedback("✓ Berhasil dikirim ke Telegram & notifikasi HP telah muncul!");
+        } else {
+          setNotifFeedback("✓ Berhasil dikirim ke Telegram! (Aktifkan izin notifikasi HP untuk pop-up layar)");
+        }
       } else {
-        setNotifFeedback(res.message);
+        if (res.deviceNotifSent) {
+          setNotifFeedback(`⚠️ Notifikasi HP muncul, tetapi Telegram gagal: ${res.message}`);
+        } else {
+          setNotifFeedback(res.message);
+        }
       }
     } catch {
-      setNotifFeedback("Gagal mengirim ke Telegram. Pastikan Telegram sudah terhubung.");
+      setNotifFeedback("Gagal memproses notifikasi. Pastikan Telegram sudah terhubung.");
     } finally {
       setSendingNotif(false);
-      setTimeout(() => setNotifFeedback(null), 4500);
+      setTimeout(() => setNotifFeedback(null), 5000);
     }
   }
 
@@ -207,10 +215,10 @@ export function DailyJajanCard({ guide, onUpdateBudgetLimit }: Props) {
               onClick={handleSendTelegramAlert}
               disabled={sendingNotif}
               className="inline-flex items-center gap-1.5 rounded-lg bg-ledger-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-ledger-700 active:scale-95 disabled:opacity-50 transition-all"
-              title="Kirim laporan ringkas langsung ke bot Telegram di HP"
+              title="Kirim laporan ringkas ke Telegram & munculkan notifikasi batasan di layar HP"
             >
               <span>📲</span>
-              <span>Kirim ke Telegram</span>
+              <span>Kirim ke Telegram & HP</span>
             </button>
           </div>
 
