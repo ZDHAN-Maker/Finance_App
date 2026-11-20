@@ -13,9 +13,14 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "typecheck:api": "tsc -p tsconfig.api.json --noEmit",
-    "test:parser": "tsx api/_lib/parser.test.ts"
+    "test:parser": "tsx api/_lib/parser.test.ts",
+    "cap:sync": "cap sync",
+    "cap:build": "vite build && cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/cli": "8.6.2",
+    "@capacitor/core": "8.6.2",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "react": "^18.3.1",

@@ -12,7 +12,19 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
 
-  const res = await fetch(`/api${path}`, {
+  // Di native Android (Capacitor), host adalah capacitor://localhost atau https://localhost
+  // sehingga /api perlu diarahkan ke URL live backend jika VITE_API_URL diisi atau fallback ke Vercel API.
+  const isCapacitor =
+    typeof window !== "undefined" &&
+    (window.location.protocol === "capacitor:" ||
+      window.location.origin.includes("localhost") &&
+      !(window.location.port === "5173" || window.location.port === "3000"));
+
+  const defaultApi = "https://finance-bv1flxygd-dhandans-projects.vercel.app";
+  const configuredApi = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
+  const baseUrl = configuredApi || (isCapacitor ? defaultApi : "");
+
+  const res = await fetch(`${baseUrl}/api${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
